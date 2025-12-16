@@ -1,0 +1,46 @@
+
+{
+    "manifest_version": 3,
+    "name": "HQChart行情数据插件",
+    "version": "1.0.1",
+    "background":
+    {
+        "service_worker": "src/HQDataWorker.js"
+    },
+
+    "action": 
+    {
+        "default_icon": { "16": "icons/icon16.png" },
+        "default_title": "HQChart行情数据插件"
+    },
+    
+    "icons": 
+    {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+
+    "externally_connectable": 
+    {
+        "matches": ["<all_urls>"]
+    },
+
+    "host_permissions":
+    [
+        "https://hq.sinajs.cn/*",
+        "https://web.ifzq.gtimg.cn/*",
+        "https://ifzq.gtimg.cn/*",
+        "https://datacenter.eastmoney.com/*",
+        "https://sqt.gtimg.cn/*",
+        "https://proxy.finance.qq.com/*",
+        "https://stock.gtimg.cn/*"
+    ],
+
+
+    "permissions":
+    [
+        "declarativeNetRequest"
+    ]
+}
