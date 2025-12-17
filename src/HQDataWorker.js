@@ -83,7 +83,7 @@ item.ArySymbol=[{ Symbol:"601006.sh" }];
 
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
-item.ArySymbol=[{ Symbol:"HSI.hk" },{ Symbol:"01211.hk"} ,{ Symbol:"300750.sz"} ];
+item.ArySymbol=[ { Symbol:"002594.sz"}, { Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  ];
 
 
 
@@ -120,8 +120,9 @@ item.ArySymbol=[{ Symbol:"600000.sh" }];
 /*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.BASE_DATA_ID;
-item.ArySymbol=[{ Symbol:"01810.hk" , Fields:{ KLine:{ Count:5 } }},{ Symbol:"000858.sz", Fields:{ MinuteClose:true }} ,{ Symbol:"300750.sz"} ];
+item.ArySymbol=[{ Symbol:"01810.hk" , Fields:{ KLine:{ Count:5 } }},{ Symbol:"HSI.hk", Fields:{ MinuteClose:true }} ,{ Symbol:"300750.sz"} ];
 */
+
 
 
 g_HQChartDataService.RequestData(item);

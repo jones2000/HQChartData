@@ -56074,6 +56074,11 @@ IFrameSplitOperator.RemoveMarketSuffix=function(symbol)
     return symbol;
 }
 
+IFrameSplitOperator.IsNumberString=function(strValue)
+{
+    return /^\d+$/.test(strValue);
+}
+
 function FrameSplitKLinePriceY()
 {
     this.newMethod=IFrameSplitOperator;   //派生

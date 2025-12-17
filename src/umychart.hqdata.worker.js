@@ -712,11 +712,13 @@ class HQDataV2
             var stockItem=recv.data[symbolInfo.FixedSymbol];
             var date=parseInt(stockItem.data.date);
             stock.Date=date;
+            var supperSymbol=stock.Symbol.toUpperCase();
             if (IFrameSplitOperator.IsNonEmptyArray(stockItem.data.data) && date>0)
             {
                 var preVol=0;
                 var preAmount=0;
-                var volBase=100;
+                var volBase=1;
+                if (MARKET_SUFFIX_NAME.IsSZ(supperSymbol) || MARKET_SUFFIX_NAME.IsSH(supperSymbol) ) volBase=100;
                 var totalAmount=0;
                 for(var i=0;i<stockItem.data.data.length;++i)
                 {
@@ -1499,7 +1501,7 @@ class HQDataV2
         {
             var text=aryLine[i];
             // 捕获 hq_str_<symbol> 和 "..." 中的内容（支持 var/let/const 可选）
-            var match = text.match(/(?:var|let|const)?\s*hq_str_([A-Za-z]+\d+)\s*=\s*['"]([^'"]*)['"]/i);
+            var match = text.match(/(?:var|let|const)?\s*hq_str_([A-Za-z0-9]+)\s*=\s*['"]([^'"]*)['"]/i);
             if (!match || match.length < 3) continue;
             var value=match[1];
             var symbol=null;
@@ -1701,8 +1703,9 @@ class HQDataV2
         var marketID=-1;
         if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))   //港股
         {
-            marketID=116;
-            if (["HSI"].includes(shortSymbol)) marketID=100;
+            if (IFrameSplitOperator.IsNumberString(shortSymbol)) marketID=116;  //股票
+            else if (["HSI","HSCEI"].includes(shortSymbol)) marketID=100;
+            else marketID=124;      //指数
         }
         else if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol))
         {
@@ -1801,15 +1804,15 @@ class HQDataV2
                         Date:date,
                         Time:time,
                         Open:parseFloat(item[1]),
-                        High:parseFloat(item[2]),
-                        Low:parseFloat(item[3]),
-                        Price:parseFloat(item[4]), 
+                        Price:parseFloat(item[2]), 
+                        High:parseFloat(item[3]),
+                        Low:parseFloat(item[4]),
                         Vol:parseFloat(item[5]),
                         Amount:parseFloat(item[6]),
                         AvPrice:parseFloat(item[7]),
                     }
 
-                    if (bStockA) minItem.vol*=100;
+                    if (bStockA) minItem.Vol*=100;
 
                     stock.Data.push(minItem);
                 }
