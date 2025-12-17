@@ -14,8 +14,10 @@ HQChartData 获取互联网免费的行情数据Chrome插件,解决数据跨域�
 ![step3](/Tutorial/image/install_step3.png)  
 3. 查看插件ID(后面使用的使用需要这个ID), 启动插件.  
 ![step4](/Tutorial/image/install_step4.png)  
-4. 下载示例, 修改插件的id(EnvironmentVariable.js)  
-![step5](/Tutorial/image/install_step5.png)  
+4. 打开示例页面, 在设置里面把插件ID填上保存  
+[https://jones2000.github.io/HQChart/webhqchart.demo/Demo_hqchart/hqchart_demo.html](https://jones2000.github.io/HQChart/webhqchart.demo/Demo_hqchart/hqchart_demo.html) 
+![step6](/Tutorial/image/install_step6.png)  
+
 
 
 

@@ -500,6 +500,8 @@ class HQDataV2
                 var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
                 if (id==0) recvData= await HQDataV2.RequestKLine_Day_QQ({Request:{ ArySymbol:[item]}});
                 else recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
+                
+                //recvData= await HQDataV2.RequestKLine_Day_QQ({Request:{ ArySymbol:[item]}});
             }
             else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
             {
@@ -806,6 +808,9 @@ class HQDataV2
         if (recv && recv.code===0 && recv.data && recv.data[symbolInfo.FixedSymbol])
         {
             var stockItem=recv.data[symbolInfo.FixedSymbol];
+            var volBase=1;
+            var upperSymbol=stock.Symbol.toUpperCase();
+            if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol)) volBase=100;
             if (IFrameSplitOperator.IsNonEmptyArray(stockItem[dataName]) && stockItem.prec>0)
             {
                 var yClose=parseFloat(stockItem.prec);
@@ -819,7 +824,7 @@ class HQDataV2
                     var close=parseFloat(item[2]);
                     var high=parseFloat(item[3]);
                     var low=parseFloat(item[4]);
-                    var vol=parseFloat(item[5])*100;
+                    var vol=parseFloat(item[5])*volBase;    //股
                     //var amount=parseFloat(item[8]);
                     var amount=null;
 
@@ -1479,7 +1484,7 @@ class HQDataV2
                                 klineData.Data=klineData.Data.slice(startIndex,endIndex);
                             }
 
-                            stockItem.KLine= aryKData;
+                            stockItem.KLine= klineData;
                         }
                     }
                     catch(error)
