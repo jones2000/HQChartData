@@ -20,10 +20,14 @@ HQChartData 获取互联网免费的行情数据Chrome插件,解决数据跨域�
 
 
 # 使用示例代码
+## 源码地址
 [https://github.com/jones2000/HQChart/tree/master/webhqchart.demo/Demo_hqchart](https://github.com/jones2000/HQChart/tree/master/webhqchart.demo/Demo_hqchart) 
+
+## 效果
 
 ![demo](/Tutorial/image/demo_1.gif)  
 
+## 项目说明
 
 | 文件| 说明 |
 | -- | -- | 
@@ -33,6 +37,13 @@ HQChartData 获取互联网免费的行情数据Chrome插件,解决数据跨域�
 |deallist.html| 详细成交明细 |
 |deal_price_list.html| 分价表 |
 |hqchart_demo|完整示例|
+
+# 数据来源说明
+| 市场    | 分时图        | K线图        | 报价 | 买卖5档 | 成交明细 | 分价表 |
+| --  | -- | -- | -- |-- | --| -- |
+|上海股票 | 腾讯,东方财富  | 腾讯,东方财富 | 新浪,腾讯 | 腾讯    | 腾讯    | 腾讯   |
+|深证股票 | 腾讯,东方财富  | 腾讯,东方财富 | 新浪,腾讯 | 腾讯    | 腾讯    | 腾讯   |
+|港股股票 | 腾讯,东方财富  | 腾讯,东方财富 | 新浪      |        |         |       |
 
 
 # 声明  

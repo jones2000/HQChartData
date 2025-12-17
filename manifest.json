@@ -35,7 +35,8 @@
         "https://datacenter.eastmoney.com/*",
         "https://sqt.gtimg.cn/*",
         "https://proxy.finance.qq.com/*",
-        "https://stock.gtimg.cn/*"
+        "https://stock.gtimg.cn/*",
+        "https://push2his.eastmoney.com/*"
     ],
 
 
