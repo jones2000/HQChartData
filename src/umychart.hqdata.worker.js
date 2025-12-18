@@ -418,7 +418,7 @@ class HQChartDataService
 
     RequestStockDetail(reqData)
     {
-        HQDataV2.RequestDetail_QQ(reqData).then((recv)=>
+        HQDataV2.RequestStockDetail(reqData).then((recv)=>
         {
             this.RecvStockDetail(recv, reqData);
         });
@@ -459,6 +459,7 @@ class HQChartDataService
 
 class HQDataV2
 {
+    //分时图
     static async RequestMinute(reqData)
     {
         var result={ AryData:[] };
@@ -473,8 +474,11 @@ class HQDataV2
                 var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
                 if (id==0) recvData= await HQDataV2.RequestMinuteV2_QQ({Request:{ ArySymbol:[item]}});
                 else recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
-
                 //recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
             
             if (recvData)
@@ -486,6 +490,7 @@ class HQDataV2
         return result;
     }
 
+    //日K
     static async RequestKLine(reqData)
     {
         var result={ AryData:[] };
@@ -503,7 +508,7 @@ class HQDataV2
                 
                 //recvData= await HQDataV2.RequestKLine_Day_QQ({Request:{ ArySymbol:[item]}});
             }
-            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
@@ -517,6 +522,7 @@ class HQDataV2
         return result;
     }
 
+    //分钟K线
     static async RequestKLineMinute(reqData)
     {
         var result={ AryData:[] };
@@ -534,9 +540,13 @@ class HQDataV2
 
                 recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
-            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) )
             {
                 recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestKLine_Minute_Futrues_SINA({Request:{ ArySymbol:[item]}});
             }
 
             if (recvData)
@@ -562,7 +572,7 @@ class HQDataV2
             {
                 aryQQ.push(item);
             }
-            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 arySINA.push(item);
             }
@@ -589,6 +599,38 @@ class HQDataV2
                     result.AryData.push({ Symbol:stockItem.Symbol,  Stock:stockItem, Code:0 });
                 }
                 
+            }
+        }
+
+        return result;
+    }
+
+    //成交明细
+    static async RequestStockDetail(reqData)
+    {
+        var result={ AryData:[] };
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var upperSymbol=item.Symbol.toUpperCase();
+            var recvData=null;
+            if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestDetail_QQ({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) )
+            {
+                //recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestDetail_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
+
+            if (recvData)
+            {
+                result.AryData.push(...recvData.AryData);
             }
         }
 
@@ -1306,10 +1348,14 @@ class HQDataV2
     static SINA=
     {
         //实时股票数据
-        Realtime:{ Url:"https://hq.sinajs.cn/" }
+        Realtime:{ Url:"https://hq.sinajs.cn/" },
+
+        //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine?symbol=AU0&type=5
+        //期货分钟K线
+        KLineMinute_Futrues:{ Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine"}
     }
 
-     //代码
+    //代码
     static ConvertToSINASymbol(symbol)
     {
         var upperSymbol=symbol.toUpperCase();
@@ -1326,7 +1372,33 @@ class HQDataV2
         {
             fixedSymbol=`hk${JSChart.GetShortSymbol(symbol)}`;
         }
+        else if (MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol)||
+            MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol))    
+        {   //国内期货
+            fixedSymbol=`nf_${JSChart.GetShortSymbol(symbol)}`;
+        }
 
+        return fixedSymbol;
+    }
+
+    //期货周期
+    static ConvertToSINAFutruesPeriod(periodID)
+    {
+        var MAP_PERIOD=new Map(
+        [
+			[5,"5"],
+			[6,"15"],
+			[7,"30"],
+			[8,"60"]
+		]);
+
+        return MAP_PERIOD.get(periodID);
+    }
+    
+    //期货代码
+    static ConvertToSINAFutruesSymbol(symbol)
+    {
+        var fixedSymbol=JSChart.GetShortSymbol(symbol);
         return fixedSymbol;
     }
 
@@ -1368,11 +1440,12 @@ class HQDataV2
         return Number(hh + mm + ss);
     }
 
-
+    //报价数据
     static async RequestStockRealtimeData_SINA(reqData)
     {
         var result={ AryData:[] };
         var mapExtendData=new Map();    //扩展数据
+        var mapSymbol=new Map();        //保存内部代码跟新浪代码对应关系
 
         var arySymbol=reqData.Request.ArySymbol;
         var aryRequest=[], reqItem=null
@@ -1390,6 +1463,8 @@ class HQDataV2
                 reqItem.ArySymbol.push(item.Symbol);
                 reqItem.StrSymbol+=`,${fixedSymbol}`;
             }
+
+            mapSymbol.set(fixedSymbol, { Symbol:item.Symbol, FixedSymbol:fixedSymbol });
 
             if (reqItem.ArySymbol.length>=120)
                 reqItem=null;
@@ -1418,7 +1493,7 @@ class HQDataV2
             const buffer = await response.arrayBuffer();
             const decoder = new TextDecoder('gb18030'); //转字符集
             const recv = decoder.decode(buffer);
-            var aryData=this.JsonToStockRealtimData_SINA(recv);
+            var aryData=this.JsonToStockRealtimData_SINA(recv, { MapSymbol:mapSymbol });
             if (IFrameSplitOperator.IsNonEmptyArray(aryData)) result.AryData.push(...aryData);
         }
 
@@ -1498,112 +1573,336 @@ class HQDataV2
         return result;
     }
 
-    static JsonToStockRealtimData_SINA(recv)
+    static JsonToStockItem_SINA(strContent, symbolInfo)
+    {
+        var match = strContent.match(/(?:var|let|const)?\s*hq_str_([A-Za-z0-9_]+)\s*=\s*['"]([^'"]*)['"]/i);
+        if (!match || match.length < 3) return null;
+        var value=match[1];
+        if (!symbolInfo.MapSymbol.has(value)) return null;
+
+        var symbol=symbolInfo.MapSymbol.get(value).Symbol;
+        var upperSymbol=symbol.toUpperCase();
+        if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol)) 
+            return HQDataV2.JsonToStockItem_StockA_SINA(symbol, strContent);
+        else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol)) 
+            return HQDataV2.JsonToStockItem_StockHK_SINA(symbol,strContent);
+        else if (MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || 
+            MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol)) 
+            return HQDataV2.JsonToStockItem_CNFutrues_SINA(symbol,strContent);
+        else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol))
+            return HQDataV2.JsonToStockItem_CFFEX_SINA(symbol,strContent);
+
+
+        return null;
+    }
+
+    //A股数据
+    static JsonToStockItem_StockA_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+
+        var item=
+        {
+            Symbol: symbol,
+            Name: arySrcValue[0],
+            Open: HQDataV2.StringToNumber(arySrcValue[1]),
+            YClose: HQDataV2.StringToNumber(arySrcValue[2]),
+            Close: HQDataV2.StringToNumber(arySrcValue[3]),
+            Price: HQDataV2.StringToNumber(arySrcValue[6]),
+            High: HQDataV2.StringToNumber(arySrcValue[4]),
+            Low: HQDataV2.StringToNumber(arySrcValue[5]),
+
+            BidPrice: HQDataV2.StringToNumber(arySrcValue[6]),   //竞买价，即“买一”报价
+            AskPrice: HQDataV2.StringToNumber(arySrcValue[7]),   //竞卖价，即“卖一”报价
+
+            Vol: HQDataV2.StringToNumber(arySrcValue[8]),               //成交量
+            Amount: HQDataV2.StringToNumber(arySrcValue[9]),            //成交金额
+
+            Buys: 
+            [
+                { Vol: HQDataV2.StringToNumber(arySrcValue[10]), Price: HQDataV2.StringToNumber(arySrcValue[11]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[12]), Price: HQDataV2.StringToNumber(arySrcValue[13]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[14]), Price: HQDataV2.StringToNumber(arySrcValue[15]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[16]), Price: HQDataV2.StringToNumber(arySrcValue[17]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[18]), Price: HQDataV2.StringToNumber(arySrcValue[19]) },  
+            ],
+            
+            Sells: 
+            [
+                { Vol: HQDataV2.StringToNumber(arySrcValue[20]), Price: HQDataV2.StringToNumber(arySrcValue[21]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[22]), Price: HQDataV2.StringToNumber(arySrcValue[23]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[24]), Price: HQDataV2.StringToNumber(arySrcValue[25]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[26]), Price: HQDataV2.StringToNumber(arySrcValue[27]) },
+                { Vol: HQDataV2.StringToNumber(arySrcValue[28]), Price: HQDataV2.StringToNumber(arySrcValue[29]) },
+            ], 
+
+            Date: HQDataV2.StringToDateNumber(arySrcValue[30]),
+            Time: HQDataV2.StringToTimeNumber(arySrcValue[31]),
+        };
+
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Increase=(item.Price-item.YClose)/item.YClose*100; //涨跌%
+            item.UpDown=item.Price-item.YClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+    //港股
+    static JsonToStockItem_StockHK_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+
+        var item=
+        {
+            Symbol: symbol,
+            ENName:arySrcValue[0],
+            Name: arySrcValue[1],
+            Open: HQDataV2.StringToNumber(arySrcValue[2]),
+            YClose: HQDataV2.StringToNumber(arySrcValue[3]),
+            High: HQDataV2.StringToNumber(arySrcValue[4]),
+            Low: HQDataV2.StringToNumber(arySrcValue[5]),
+            Close: HQDataV2.StringToNumber(arySrcValue[6]),
+            Price: HQDataV2.StringToNumber(arySrcValue[6]),
+
+            BidPrice: HQDataV2.StringToNumber(arySrcValue[9]),   //竞买价，即“买一”报价
+            AskPrice: HQDataV2.StringToNumber(arySrcValue[10]),   //竞卖价，即“卖一”报价
+
+            Vol: HQDataV2.StringToNumber(arySrcValue[12]),               //成交量
+            Amount: HQDataV2.StringToNumber(arySrcValue[11]),            //成交金额
+
+            Date: HQDataV2.StringToDateNumber(arySrcValue[17]),
+            Time: HQDataV2.StringToTimeNumberV2(arySrcValue[18]),
+        };
+
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Increase=(item.Price-item.YClose)/item.YClose*100; //涨跌%
+            item.UpDown=item.Price-item.YClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+    //国内期货
+    static JsonToStockItem_CNFutrues_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+
+        var item=
+        {
+            Symbol: symbol,
+            Name: arySrcValue[0],
+            Time: parseInt(arySrcValue[1]),
+            Open: HQDataV2.StringToNumber(arySrcValue[2]),
+            High: HQDataV2.StringToNumber(arySrcValue[3]),
+            Low: HQDataV2.StringToNumber(arySrcValue[4]),
+            YClose: HQDataV2.StringToNumber(arySrcValue[5]),
+            BidPrice: HQDataV2.StringToNumber(arySrcValue[6]),   //竞买价，即“买一”报价
+            AskPrice: HQDataV2.StringToNumber(arySrcValue[7]),   //竞卖价，即“卖一”报价
+            Close: HQDataV2.StringToNumber(arySrcValue[8]),
+            Price: HQDataV2.StringToNumber(arySrcValue[8]),
+            FClose:HQDataV2.StringToNumber(arySrcValue[9]),     //结算价 
+            YFClose:HQDataV2.StringToNumber(arySrcValue[10]),   //昨结算 
+            BidVol:HQDataV2.StringToNumber(arySrcValue[11]),    //买 量 
+            AskVol:HQDataV2.StringToNumber(arySrcValue[12]),    //卖 量 
+            Position: HQDataV2.StringToNumber(arySrcValue[13]),            //持仓量
+            Vol: HQDataV2.StringToNumber(arySrcValue[14]),                 //成交量
+            Date: HQDataV2.StringToDateNumber(arySrcValue[17]),
+        };
+
+
+
+        item.Buys=[ { Vol: item.BidVol, Price: item.BidPrice } ];
+        item.Sells=[ { Vol: item.AskVol, Price: item.AskPrice } ];
+
+        //涨跌幅=（ 现价—上一交易日结算价）/上一交易日结算价×100%
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Increase=(item.Price-item.YFClose)/item.YFClose*100; //涨跌%
+            item.UpDown=item.Price-item.YFClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YFClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+    //中金所期货
+    static JsonToStockItem_CFFEX_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+
+        var item=
+        {
+            Symbol: symbol,
+            Name: arySrcValue[49],
+
+            Open: HQDataV2.StringToNumber(arySrcValue[0]),
+            High: HQDataV2.StringToNumber(arySrcValue[1]),
+            Low: HQDataV2.StringToNumber(arySrcValue[2]),
+            Close: HQDataV2.StringToNumber(arySrcValue[3]),
+            Price: HQDataV2.StringToNumber(arySrcValue[3]),
+            Vol: HQDataV2.StringToNumber(arySrcValue[4]),       //成交量
+            Position: HQDataV2.StringToNumber(arySrcValue[6]),  //持仓量
+            YClose: HQDataV2.StringToNumber(arySrcValue[13]),   //昨收
+            YFClose:HQDataV2.StringToNumber(arySrcValue[14]),   //昨结算 
+
+            FClose:HQDataV2.StringToNumber(arySrcValue[8]),     //结算价 ??可能
+           
+            BidPrice:HQDataV2.StringToNumber(arySrcValue[16]),   //竞买价，即“买一”报价
+            AskPrice:HQDataV2.StringToNumber(arySrcValue[26]),   //竞卖价，即“卖一”报价
+
+            AvPrice:HQDataV2.StringToNumber(arySrcValue[48]),    //均价
+           
+            BidVol:HQDataV2.StringToNumber(arySrcValue[17]),    //买 量 
+            AskVol:HQDataV2.StringToNumber(arySrcValue[27]),    //卖 量 
+                           
+            Date: HQDataV2.StringToDateNumber(arySrcValue[36]),
+            Time: HQDataV2.StringToTimeNumber(arySrcValue[37]),
+        };
+
+        item.UpLimit=HQDataV2.StringToNumber(arySrcValue[9]); //涨停价
+        item.DownLimit=HQDataV2.StringToNumber(arySrcValue[10]); //跌停价
+
+        item.Buys=[ { Vol: item.BidVol, Price: item.BidPrice } ];
+        item.Sells=[ { Vol: item.AskVol, Price: item.AskPrice } ];
+
+        //涨跌幅=（ 现价—上一交易日结算价）/上一交易日结算价×100%
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Increase=(item.Price-item.YFClose)/item.YFClose*100; //涨跌%
+            item.UpDown=item.Price-item.YFClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YFClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+
+    static JsonToStockRealtimData_SINA(recv, symbolInfo)
     {
         var aryStock=[];
         var aryLine=recv.split("\n");
         for(var i=0;i<aryLine.length;i++)
         {
             var text=aryLine[i];
-            // 捕获 hq_str_<symbol> 和 "..." 中的内容（支持 var/let/const 可选）
-            var match = text.match(/(?:var|let|const)?\s*hq_str_([A-Za-z0-9]+)\s*=\s*['"]([^'"]*)['"]/i);
-            if (!match || match.length < 3) continue;
-            var value=match[1];
-            var symbol=null;
-            if (value.indexOf("sz")===0) symbol=`${value.substring(2)}.sz`;
-            else if (value.indexOf("sh")===0) symbol=`${value.substring(2)}.sh`;
-            else if (value.indexOf("hk")===0) symbol=`${value.substring(2)}.hk`;
-            else continue;
-
-            var match = text.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
-            if (!match || !match[1]) continue;
-            
-            var strValue=match[0];
-            var strValue=match[1];
-            var arySrcValue=strValue.split(",");
-
-            var upperSymbol=symbol.toUpperCase();
-            if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
-            {
-                var item=
-                {
-                    Symbol: symbol,
-                    ENName:arySrcValue[0],
-                    Name: arySrcValue[1],
-                    Open: HQDataV2.StringToNumber(arySrcValue[2]),
-                    YClose: HQDataV2.StringToNumber(arySrcValue[3]),
-                    High: HQDataV2.StringToNumber(arySrcValue[4]),
-                    Low: HQDataV2.StringToNumber(arySrcValue[5]),
-                    Close: HQDataV2.StringToNumber(arySrcValue[6]),
-                    Price: HQDataV2.StringToNumber(arySrcValue[6]),
-
-                    BidPrice: HQDataV2.StringToNumber(arySrcValue[9]),   //竞买价，即“买一”报价
-                    AskPrice: HQDataV2.StringToNumber(arySrcValue[10]),   //竞卖价，即“卖一”报价
-
-                    Vol: HQDataV2.StringToNumber(arySrcValue[12]),               //成交量
-                    Amount: HQDataV2.StringToNumber(arySrcValue[11]),            //成交金额
-
-                    Date: HQDataV2.StringToDateNumber(arySrcValue[17]),
-                    Time: HQDataV2.StringToTimeNumberV2(arySrcValue[18]),
-                };
-            }
-            else
-            {
-                var item=
-                {
-                    Symbol: symbol,
-                    Name: arySrcValue[0],
-                    Open: HQDataV2.StringToNumber(arySrcValue[1]),
-                    YClose: HQDataV2.StringToNumber(arySrcValue[2]),
-                    Close: HQDataV2.StringToNumber(arySrcValue[3]),
-                    Price: HQDataV2.StringToNumber(arySrcValue[6]),
-                    High: HQDataV2.StringToNumber(arySrcValue[4]),
-                    Low: HQDataV2.StringToNumber(arySrcValue[5]),
-
-                    BidPrice: HQDataV2.StringToNumber(arySrcValue[6]),   //竞买价，即“买一”报价
-                    AskPrice: HQDataV2.StringToNumber(arySrcValue[7]),   //竞卖价，即“卖一”报价
-
-                    Vol: HQDataV2.StringToNumber(arySrcValue[8]),               //成交量
-                    Amount: HQDataV2.StringToNumber(arySrcValue[9]),            //成交金额
-
-                    Buys: 
-                    [
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[10]), Price: HQDataV2.StringToNumber(arySrcValue[11]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[12]), Price: HQDataV2.StringToNumber(arySrcValue[13]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[14]), Price: HQDataV2.StringToNumber(arySrcValue[15]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[16]), Price: HQDataV2.StringToNumber(arySrcValue[17]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[18]), Price: HQDataV2.StringToNumber(arySrcValue[19]) },  
-                    ],
-                    
-                    Sells: 
-                    [
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[20]), Price: HQDataV2.StringToNumber(arySrcValue[21]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[22]), Price: HQDataV2.StringToNumber(arySrcValue[23]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[24]), Price: HQDataV2.StringToNumber(arySrcValue[25]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[26]), Price: HQDataV2.StringToNumber(arySrcValue[27]) },
-                        { Vol: HQDataV2.StringToNumber(arySrcValue[28]), Price: HQDataV2.StringToNumber(arySrcValue[29]) },
-                    ], 
-
-                    Date: HQDataV2.StringToDateNumber(arySrcValue[30]),
-                    Time: HQDataV2.StringToTimeNumber(arySrcValue[31]),
-                }
-            }
-            
-            if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
-            {
-                item.Increase=(item.Price-item.YClose)/item.YClose*100; //涨跌%
-                item.UpDown=item.Price-item.YClose; //涨跌
-            }
-
-            if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YClose))
-            {
-                item.Amplitude=(item.High-item.Low)/item.YClose*100;    //振幅%
-            }
-
-            aryStock.push(item);
+            var item=HQDataV2.JsonToStockItem_SINA(text, symbolInfo);
+            if (item) aryStock.push(item);
         }
 
         return aryStock;
+    }
+
+    //分钟K线数据 期货的
+    static async RequestKLine_Minute_Futrues_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var period=5, count=640, right=0;
+            var startDate="", endDate="";   //1999-01-01
+            if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
+            if (IFrameSplitOperator.IsNumber(item.Period)) period=item.Period;
+
+            var fixedPeriod=HQDataV2.ConvertToSINAFutruesPeriod(period);
+            var fixedSymbol=HQDataV2.ConvertToSINAFutruesSymbol(symbol);
+
+            try
+            {
+                //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine?symbol=AU0&type=5
+                var url=`${HQDataV2.SINA.KLineMinute_Futrues.Url}?symbol=${fixedSymbol}&type=${fixedPeriod}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.text();
+
+                var stockItem=HQDataV2.RecvKLine_Minute_Futrues_SINA(recv,  { Symbol:symbol, FixedSymbol:fixedSymbol, FixedPeriod:fixedPeriod });
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static RecvKLine_Minute_Futrues_SINA(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Name:symbolInfo.FixedSymbol, Data:[] };
+
+        const mainRegex = /(.*?)\s*=\s*\((\[.*?\])\s*\);/gs;
+        const mainMatch = mainRegex.exec(recv);
+
+        if (!mainMatch) return stock;
+
+        var strContent = mainMatch[2].trim(); // 数组部分字符串([ { ... }, { ... } ])
+        var jsonData=`{\"klines\":${strContent}}`;
+        var data=JSON.parse(jsonData);
+        if (!IFrameSplitOperator.IsNonEmptyArray(data.klines)) return stock;
+
+        var yClose=null;
+        for(var i=0;i<data.klines.length;++i)
+        {
+            var item=data.klines[i];
+            var day = new Date(item.d);
+            var date=day.getFullYear()*10000+(day.getMonth()+1)*100+day.getDate();
+		    var time=day.getHours()*100+day.getMinutes();
+            var open=parseFloat(item.o);
+            var close=parseFloat(item.c);
+            var high=parseFloat(item.h);
+            var low=parseFloat(item.l);
+            var vol=parseFloat(item.v);
+            var kItem={ Date:date, Time:time, YClose:yClose,  Open:open, Close:close, High:high, Low:low, Vol:vol, Amount:null };
+
+            yClose=close;
+
+            stock.Data.push(kItem);
+        }
+
+        return stock;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -1612,7 +1911,11 @@ class HQDataV2
     {
         Share:{ Url:'https://datacenter.eastmoney.com/securities/api/data/v1/get', Columns:'SECUCODE,SECURITY_CODE,END_DATE,TOTAL_SHARES,LIMITED_SHARES,LIMITED_OTHARS,LIMITED_DOMESTIC_NATURAL,LIMITED_STATE_LEGAL,LIMITED_OVERSEAS_NOSTATE,LIMITED_OVERSEAS_NATURAL,UNLIMITED_SHARES,LISTED_A_SHARES,B_FREE_SHARE,H_FREE_SHARE,FREE_SHARES,LIMITED_A_SHARES,NON_FREE_SHARES,LIMITED_B_SHARES,OTHER_FREE_SHARES,LIMITED_STATE_SHARES,LIMITED_DOMESTIC_NOSTATE,LOCK_SHARES,LIMITED_FOREIGN_SHARES,LIMITED_H_SHARES,SPONSOR_SHARES,STATE_SPONSOR_SHARES,SPONSOR_SOCIAL_SHARES,RAISE_SHARES,RAISE_STATE_SHARES,RAISE_DOMESTIC_SHARES,RAISE_OVERSEAS_SHARES,CHANGE_REASON' },
         Minute:{ Url:"https://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58"},
-        KLine:{ Url:"https://push2his.eastmoney.com/api/qt/stock/kline/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"}
+        KLine:{ Url:"https://push2his.eastmoney.com/api/qt/stock/kline/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"},
+
+        //成交明细
+        //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
+        Detail:{ Url:"https://futsseapi.eastmoney.com/static/"}
     }
 
     //股本数据
@@ -1720,6 +2023,45 @@ class HQDataV2
         {
             marketID=1;
         }
+        else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol))
+        {
+            marketID=220;
+        }
+        else if (MARKET_SUFFIX_NAME.IsDCE(upperSymbol))
+        {
+            marketID=114;
+        }
+        else if (MARKET_SUFFIX_NAME.IsCZCE(upperSymbol))
+        {
+             //郑州商品交易所 去掉前面的年份 坑~~
+            //核心正则：^开头 + 字母段 + 数字段 + $结尾
+            const reg = /^([a-zA-Z]+)(\d+)$/;
+            const matchResult = shortSymbol.match(reg);
+            if (matchResult)
+            {
+                var name=matchResult[1];
+                var number=matchResult[2];
+                if (number.length==4) shortSymbol=`${name}${number.slice(1)}`;
+            }
+
+            marketID=115;
+        }
+        else if (MARKET_SUFFIX_NAME.IsSHFE(upperSymbol))
+        {
+            marketID=113;
+
+            if (shortSymbol=="AU0") shortSymbol="aum";
+               
+        }
+        else if (MARKET_SUFFIX_NAME.IsGZFE(upperSymbol))
+        {
+            marketID=225;
+        }
+        else if (MARKET_SUFFIX_NAME.IsINE(upperSymbol)) //上期能源
+        {
+            marketID=142;
+        }
+        
 
         return { MarketID:marketID, Symbol:shortSymbol };
     }
@@ -1998,6 +2340,90 @@ class HQDataV2
         }
 
         return stock;
+    }
+
+
+    //成交明细(期货)
+    static async RequestDetail_EASTMONEY(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToEASTMONEYSymbol(symbol);
+            var count=50;
+            if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
+
+            //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
+            var url=`${HQDataV2.EASTMONEY.Detail.Url}${fixedSymbol.MarketID}_${fixedSymbol.Symbol}_mx/${count}?${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json();
+
+                var stockItem=HQDataV2.JsonToStockDetailData_EASTMONEY(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+
+                var realtimeData=await HQDataV2.RequestStockRealtimeData_SINA({Request:{ ArySymbol:[{ Symbol:symbol}]}});
+                if (IFrameSplitOperator.IsNonEmptyArray(realtimeData.AryData) && realtimeData.AryData[0])
+                {
+                    var subItem=realtimeData.AryData[0];
+                    if (subItem.Symbol==symbol)
+                    {
+                        if (IFrameSplitOperator.IsNumber(subItem.YClose)) stockItem.YClose=subItem.YClose;
+                        if (IFrameSplitOperator.IsNumber(subItem.YFClose)) stockItem.YFClose=subItem.YFClose;
+                    }
+                   
+                }
+
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToStockDetailData_EASTMONEY(recv, symbolInfo)
+    {
+        var stockItem={ Symbol:symbolInfo.Symbol, Date:null, Data:[] };
+        if (!recv || !IFrameSplitOperator.IsNonEmptyArray(recv.mx)) return stockItem;
+
+        for(var i=0;i<recv.mx.length;++i)
+        {
+            var item=recv.mx[i];
+
+            var today = new Date(item.utime*1000);  
+            var date=today.getFullYear()*10000+(today.getMonth()+1)*100+today.getDate();
+            var time=today.getHours()*100+today.getMinutes();
+            var time2=today.getHours()*10000+today.getMinutes()*100+today.getSeconds();
+            var price=item.p;
+            var vol=item.vol;
+            var diff=item.zcl;  //仓差(持仓变化)
+            var type=item.jylx; //1 = 开仓、2 = 平仓
+
+            //根据原始代码猜的
+            //o > 0 && Math.abs(o) == c ? "双开" : o < 0 && Math.abs(o) == c ? "双平" : 1 == i && o < 0 ? "多平" : 2 == i && o < 0 ? "空平" : 2 == i && o > 0 ? "多开" : 1 == i && o > 0 ? "空开" : 2 == i && 0 == o ? "多换" : 1 == i && 0 == o ? "空换" : ""), -1, l, -1)
+            var flag="";
+            if (diff > 0 && Math.abs(diff) == vol) flag="双开";
+            else if (diff < 0 && Math.abs(diff) == vol) flag="双平";
+            else if (1 == type && diff < 0) flag="多平";
+            else if (2 == type && diff < 0) flag= "空平";
+            else if (2 == type && diff > 0) flag="多开";
+            else if (1 == type && diff > 0) flag="空开";
+            else if (2 == type && 0 == diff) flag="多换";
+            else if (1 == type && 0 == diff) flag="空换";
+            stockItem.Data.push({ Time:time, Time2:time2, Price:price, Vol:vol, ID:item.utime, PositionChange:diff, Type:type, Flag:flag })
+        }
+
+        stockItem.Data.sort((left, right)=>{ return left.Time2-right.Time2; });
+        return stockItem;
     }
 }
 

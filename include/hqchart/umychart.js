@@ -79391,13 +79391,13 @@ function JSChartResource()
         {
             Color:"RGB(60,60,60)",
             Mergin:{ Left:5, Right:5, Top:4, Bottom:2 },
-            Font:{ Size:12, Name:"微软雅黑" }
+            Font:{ Size:14, Name:"微软雅黑" }
         },
 
         Row:
         {
             Mergin:{ Top:2, Bottom:2 },
-            Font:{ Size:15, Name:"微软雅黑"},
+            Font:{ Size:14, Name:"微软雅黑"},
             BarMergin:{ Top:2, Left:3, Right:3, Bottom:2 }
         },
 
@@ -79775,7 +79775,9 @@ function JSChartResource()
                 { Font:`${16*GetDevicePixelRatio()}px 微软雅黑`,Color:"rgb(90,90,90)", Margin:{ Left:5, Top:5, Bottom:5, Right:5, YOffset:0 } }
             ],
 
-            TextColor:"rgb(100,100,10)"
+            TextColor:"rgb(100,100,10)",
+
+            BottomLine:{ Enable:true, Color:"rgb(192,192,192)"} ,    //底部分割线
         },
 
         BuySell:
@@ -79785,8 +79787,14 @@ function JSChartResource()
             VolColor:"rgb(90,90,90)",
             Margin:{ Left:0, Top:0, Bottom:0, Right:0 },
             CellMargin:{ Top:5, Bottom:5, Left:5, Right:5, YOffset:0 },
-            BottomLine:{ Enable:true, Color:"rgb(192,192,192)"} ,    //底部分割线
-            TopLine:{ Enable:true, Color:"rgb(192,192,192)"} ,    //底部分割线
+            BottomLine:{ Enable:true, Color:"rgb(192,192,192)"},    //底部分割线
+            TopLine:{ Enable:false, Color:"rgb(192,192,192)"},    //底部分割线
+
+            CenterLine:
+            {
+                BuyColor:"rgb(228, 164, 54)",SellColor:"rgb(61, 147, 219)", NoneColor:"rgb(90,90,90)",
+                Width:2*GetDevicePixelRatio()
+            }
         },
 
         Table:
@@ -80809,6 +80817,15 @@ function JSChartResource()
                 if (IFrameSplitOperator.IsBool(subItem.Enable)) dest.BuySell.TopLine.Enable=subItem.Enable;
             }
 
+            if (item.CenterLine)
+            {
+                var subItem=item.CenterLine;
+                if (subItem.BuyColor) dest.BuySell.CenterLine.BuyColor=subItem.BuyColor;
+                if (subItem.SellColor) dest.BuySell.CenterLine.SellColor=subItem.SellColor;
+                if (subItem.NoneColor) dest.BuySell.CenterLine.NoneColor=subItem.NoneColor;
+                if (IFrameSplitOperator.IsNumber(subItem.Width)) dest.BuySell.CenterLine.Width=subItem.Width;
+            }
+
             
         }
 
@@ -80873,6 +80890,13 @@ function JSChartResource()
                         if (IFrameSplitOperator.IsNumber(margin.YOffset)) subDest.YOffset=margin.YOffset
                     }
                 }
+            }
+
+            if (item.BottomLine)
+            {
+                var subItem=item.BottomLine;
+                if (subItem.Color) dest.Header.BottomLine.Color=subItem.Color;
+                if (IFrameSplitOperator.IsBool(subItem.Enable)) dest.Header.BottomLine.Enable=subItem.Enable;
             }
         }
 
@@ -102478,6 +102502,7 @@ var MARKET_SUFFIX_NAME=
     DCE: '.DCE',         //大连商品交易所(Dalian Commodity Exchange)
     CZCE: '.CZC',        //郑州期货交易所
     GZFE:".GZFE",        //广州期货交易所
+    INE:".INE",          //上海国际能源交易中心
 
     USA:'.USA',          //美股
     FTSE:'.FTSE',        //富时中国
@@ -102722,10 +102747,18 @@ var MARKET_SUFFIX_NAME=
         return upperSymbol.indexOf(this.GZFE) > 0;
     },
 
+    IsINE:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        return upperSymbol.indexOf(this.INE) > 0;
+    },
+
     IsChinaFutures:function(upperSymbol)   //是否是国内期货 /期权
     {
+        if (!upperSymbol) return false;
+        
         return this.IsSHO(upperSymbol) || this.IsSZO(upperSymbol) || 
-            this.IsGZFE(upperSymbol) ||
+            this.IsGZFE(upperSymbol) || this.IsINE(upperSymbol) ||
             this.IsCFFEX(upperSymbol) || this.IsCZCE(upperSymbol) || this.IsDCE(upperSymbol) || this.IsSHFE(upperSymbol);
     },
 
@@ -102866,6 +102899,18 @@ var MARKET_SUFFIX_NAME=
         if (upperSymbol.charAt(0)=='3' && upperSymbol.charAt(1)=='0')
             return true;
         
+        return false;
+    },
+
+    IsHKStock:function(symbol)  //港股股票 全是数字
+    {
+        if (!symbol) return false;
+        var upperSymbol=symbol.toUpperCase();
+        if (!this.IsHK(upperSymbol)) return false;
+
+        var shortSymbol=this.GetShortSymbol(symbol);
+        if (IFrameSplitOperator.IsNumberString(shortSymbol)) return true;
+
         return false;
     },
 
@@ -103568,7 +103613,8 @@ function MinuteTimeStringData()
         if (MARKET_SUFFIX_NAME.IsTW(upperSymbol)) return this.GetTW(upperSymbol);
         if (MARKET_SUFFIX_NAME.IsJP(upperSymbol)) return this.GetJP(upperSymbol);
         if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol)) return this.GetUSA(upperSymbol);
-        if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsGZFE(upperSymbol))
+        if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || 
+            MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol))
         {
             var splitData = g_FuturesTimeData.GetSplitData(upperSymbol, option);
             if (!splitData) return null;
@@ -104060,7 +104106,7 @@ function MinuteCoordinateData()
                 data=this.GetTWData(upperSymbol,width);
             else if (MARKET_SUFFIX_NAME.IsJP(upperSymbol))
                 data=this.GetJPData(upperSymbol,width);
-            else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsGZFE(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol))
                 return this.GetChinatFuturesData(upperSymbol, width, option);
             else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
                 data = this.GetUSAData(upperSymbol,width);
@@ -104907,6 +104953,13 @@ function FuturesTimeData()
         [MARKET_SUFFIX_NAME.SHFE + '-LU', {Time:6,Decimal:0,Name:'低硫燃油'}],
         [MARKET_SUFFIX_NAME.SHFE + '-BC', {Time:4,Decimal:0,Name:'国际铜'}],
         [MARKET_SUFFIX_NAME.SHFE + '-EC', {Time:0,Decimal:0,Name:'集运指数'}],
+
+        //上海国际能源交易中心 独立的一个市场
+        [MARKET_SUFFIX_NAME.INE + '-NR', {Time:6,Decimal:1,Name:'20号胶'}],
+        [MARKET_SUFFIX_NAME.INE + '-SC', {Time:5,Decimal:1,Name:'原油'}],
+        [MARKET_SUFFIX_NAME.INE + '-LU', {Time:6,Decimal:0,Name:'低硫燃油'}],
+        [MARKET_SUFFIX_NAME.INE + '-BC', {Time:4,Decimal:0,Name:'国际铜'}],
+        [MARKET_SUFFIX_NAME.INE + '-EC', {Time:0,Decimal:0,Name:'集运指数'}],
        
         //郑州期货交易所
         [MARKET_SUFFIX_NAME.CZCE + '-CF', {Time:6,Decimal:0,Name:"棉花"}],
@@ -105019,6 +105072,11 @@ function FuturesTimeData()
             twoWordsName = MARKET_SUFFIX_NAME.CZCE + '-' + twoWords;
         }
         else if (MARKET_SUFFIX_NAME.IsGZFE(upperSymbol))    //广州期货交易所
+        {
+            oneWordName = MARKET_SUFFIX_NAME.GZFE + '-' + oneWord;
+            twoWordsName = MARKET_SUFFIX_NAME.GZFE + '-' + twoWords;
+        }
+        else if (MARKET_SUFFIX_NAME.IsINE(upperSymbol))     //上海国际能源交易中心
         {
             oneWordName = MARKET_SUFFIX_NAME.GZFE + '-' + oneWord;
             twoWordsName = MARKET_SUFFIX_NAME.GZFE + '-' + twoWords;

@@ -36,7 +36,9 @@
         "https://sqt.gtimg.cn/*",
         "https://proxy.finance.qq.com/*",
         "https://stock.gtimg.cn/*",
-        "https://push2his.eastmoney.com/*"
+        "https://push2his.eastmoney.com/*",
+        "https://stock2.finance.sina.com.cn/*",
+        "https://futsseapi.eastmoney.com/*"
     ],
 
 
