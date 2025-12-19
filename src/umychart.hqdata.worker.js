@@ -478,12 +478,26 @@ class HQDataV2
             }
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
-                recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
+                //var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
+                //if (id==0) recvData=await HQDataV2.RequestMinute_Futrues_SINA({Request:{ ArySymbol:[item]}});
+                //else recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
+
+                recvData=await HQDataV2.RequestMinute_Futrues_SINA({Request:{ ArySymbol:[item]}});
             }
             
             if (recvData)
             {
                 result.AryData.push(...recvData.AryData);
+
+                //缓存
+                for(var j=0;j<recvData.AryData.length;++j)
+                {
+                    var item=recvData.AryData[j];
+                    if (!item || item.Code!=0 || !item.Stock) continue;
+                    MinuteDataCache.UpdateCache(item.Stock);
+                }
+
+                    
             }
         }
 
@@ -535,10 +549,10 @@ class HQDataV2
             if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol))
             {
                 var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
-                //if (id==0) recvData= await HQDataV2.RequestKLine_Minute_QQ({Request:{ ArySymbol:[item]}});
-                //else recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
+                if (id==0) recvData= await HQDataV2.RequestKLine_Minute_QQ({Request:{ ArySymbol:[item]}});
+                else recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
 
-                recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
+                //recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
             else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) )
             {
@@ -1352,7 +1366,10 @@ class HQDataV2
 
         //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine?symbol=AU0&type=5
         //期货分钟K线
-        KLineMinute_Futrues:{ Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine"}
+        KLineMinute_Futrues:{ Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine"},
+
+        //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine?symbol=FU2109
+        Minute_Futrues:{Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine" },
     }
 
     //代码
@@ -1510,26 +1527,39 @@ class HQDataV2
                 if (extendData.MinuteClose)
                 {
                     var symbol=stockItem.Symbol;
-                    var aryStockData=await HQDataV2.RequestMinute({ Request:{ ArySymbol:[ {Symbol:symbol} ] } });
-
-                    try
+                    var minData=MinuteDataCache.GetCache(symbol);
+                    if (minData)
                     {
-                        if (aryStockData && IFrameSplitOperator.IsNonEmptyArray(aryStockData.AryData) && aryStockData.AryData[0])
+                        stockItem.Minute={ YClose:minData.YClose, Date:minData.Date, AryClose:[] };
+                        for(var j=0;j<minData.Data.length;++j)
                         {
-                            var minData=aryStockData.AryData[0].Stock;
-                            stockItem.Minute={ YClose:minData.YClose, Date:minData.Date, AryClose:[] };
-                            for(var j=0;j<minData.Data.length;++j)
-                            {
-                                var minItem=minData.Data[j];
-                                stockItem.Minute.AryClose.push(minItem.Price);
-                            }
+                            var minItem=minData.Data[j];
+                            stockItem.Minute.AryClose.push(minItem.Price);
                         }
-
-                        
                     }
-                    catch(error)
+                    else
                     {
-                       
+                        var aryStockData=await HQDataV2.RequestMinute({ Request:{ ArySymbol:[ {Symbol:symbol} ] } });
+
+                        try
+                        {
+                            if (aryStockData && IFrameSplitOperator.IsNonEmptyArray(aryStockData.AryData) && aryStockData.AryData[0])
+                            {
+                                var minData=aryStockData.AryData[0].Stock;
+                                stockItem.Minute={ YClose:minData.YClose, Date:minData.Date, AryClose:[] };
+                                for(var j=0;j<minData.Data.length;++j)
+                                {
+                                    var minItem=minData.Data[j];
+                                    stockItem.Minute.AryClose.push(minItem.Price);
+                                }
+                            }
+
+                            
+                        }
+                        catch(error)
+                        {
+                        
+                        }
                     }
                 }
 
@@ -1895,11 +1925,89 @@ class HQDataV2
             var high=parseFloat(item.h);
             var low=parseFloat(item.l);
             var vol=parseFloat(item.v);
-            var kItem={ Date:date, Time:time, YClose:yClose,  Open:open, Close:close, High:high, Low:low, Vol:vol, Amount:null };
+            var position=parseFloat(item.p);
+            var kItem={ Date:date, Time:time, YClose:yClose,  Open:open, Close:close, High:high, Low:low, Vol:vol, Amount:null, Position:position };
 
             yClose=close;
 
             stock.Data.push(kItem);
+        }
+
+        return stock;
+    }
+
+    //期货分时图
+    static async RequestMinute_Futrues_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToSINAFutruesSymbol(symbol);
+
+           
+            //var url=`https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_${internalSymbol}=/InnerFuturesNewService.getMinLine?symbol=${internalSymbol}`;
+
+            var url=`${HQDataV2.SINA.Minute_Futrues.Url}?symbol=${fixedSymbol}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.text();
+
+                var stockItem=HQDataV2.JsonToMinuteFutruesData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToMinuteFutruesData_SINA(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Name:symbolInfo.FixedSymbol, Data:[] };
+
+        const mainRegex = /(.*?)\s*=\s*\((\[.*?\])\s*\);/gs;
+        const mainMatch = mainRegex.exec(recv);
+
+        if (!mainMatch) return stock;
+
+        var strContent = mainMatch[2].trim(); // 数组部分字符串([ { ... }, { ... } ])
+        var jsonData=`{\"minutes\":${strContent}}`;
+        var data=JSON.parse(jsonData);
+        if (!IFrameSplitOperator.IsNonEmptyArray(data.minutes)) return stock;
+        var date=null, preDate=null, yClose=null;
+        for(var i=0;i<data.minutes.length;++i)
+        {
+            var aryData=data.minutes[i];
+            if (i==0)
+            {
+                yClose=parseFloat(aryData[5]);
+                stock.YClose=yClose;
+                var day = new Date(aryData[6]);
+			    var date=day.getFullYear()*10000+(day.getMonth()+1)*100+day.getDate();
+
+                //上一天
+                day.setDate(day.getDate()-1); 
+                preDate=day.getFullYear()*10000+(day.getMonth()+1)*100+day.getDate();
+            }
+
+            var time=parseInt(HQDataV2.StringToTimeNumberV2(aryData[0])/100);
+            var price=parseFloat(aryData[1]);
+            var avPrice=parseFloat(aryData[2]);
+            var vol=parseFloat(aryData[3]);
+            var position=parseFloat(aryData[4]);
+            var minItem={ Date:date, Time:time, Price:price, Vol:vol, Amount:null, AvPrice:avPrice, Position:position };
+            if (minItem.Time>2100) minItem.Date=preDate;
+
+            stock.Data.push(minItem);
         }
 
         return stock;
@@ -1911,7 +2019,7 @@ class HQDataV2
     {
         Share:{ Url:'https://datacenter.eastmoney.com/securities/api/data/v1/get', Columns:'SECUCODE,SECURITY_CODE,END_DATE,TOTAL_SHARES,LIMITED_SHARES,LIMITED_OTHARS,LIMITED_DOMESTIC_NATURAL,LIMITED_STATE_LEGAL,LIMITED_OVERSEAS_NOSTATE,LIMITED_OVERSEAS_NATURAL,UNLIMITED_SHARES,LISTED_A_SHARES,B_FREE_SHARE,H_FREE_SHARE,FREE_SHARES,LIMITED_A_SHARES,NON_FREE_SHARES,LIMITED_B_SHARES,OTHER_FREE_SHARES,LIMITED_STATE_SHARES,LIMITED_DOMESTIC_NOSTATE,LOCK_SHARES,LIMITED_FOREIGN_SHARES,LIMITED_H_SHARES,SPONSOR_SHARES,STATE_SPONSOR_SHARES,SPONSOR_SOCIAL_SHARES,RAISE_SHARES,RAISE_STATE_SHARES,RAISE_DOMESTIC_SHARES,RAISE_OVERSEAS_SHARES,CHANGE_REASON' },
         Minute:{ Url:"https://push2his.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58"},
-        KLine:{ Url:"https://push2his.eastmoney.com/api/qt/stock/kline/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"},
+        KLine:{ Url:"https://push2his.eastmoney.com/api/qt/stock/kline/get?fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f66"},
 
         //成交明细
         //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
@@ -2228,6 +2336,11 @@ class HQDataV2
             var data=recv.data;
             stock.Name=data.name;
             var yClose=data.preKPrice;
+            var upperSymbol=null;
+            if (stock.Symbol) upperSymbol=stock.Symbol.toUpperCase();
+            var bFutrues=MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol);
+            var volBase=1;
+            if (MARKET_SUFFIX_NAME.IsSHSZ(upperSymbol)) volBase=100;
             if (IFrameSplitOperator.IsNonEmptyArray(data.klines))
             {
                 for(var i=0;i<data.klines.length; ++i)
@@ -2241,9 +2354,9 @@ class HQDataV2
                     var close=parseFloat(item[2]);
                     var high=parseFloat(item[3]);
                     var low=parseFloat(item[4]);
-                    var vol=parseFloat(item[5])*100;
+                    var vol=parseFloat(item[5])*volBase;
                     var amount=parseFloat(item[6]);
-
+                    
                     var newItem={ Date:date, YClose:yClose,  Open:open, Close:close, High:high, Low:low, Vol:vol, Amount:amount };
 
                     var value=parseFloat(item[10]); //换手率
@@ -2251,6 +2364,12 @@ class HQDataV2
                     {
                         var flowCapital=vol/value*100;
                         newItem.FlowCapital=flowCapital;    //流通股本
+                    }
+
+                    if (bFutrues) 
+                    {
+                        newItem.Position=parseFloat(item[11]);  //持仓
+                        //newItem.FClose=parseFloat(item[12]);    //结算价
                     }
                 
                     stock.Data.push(newItem);
@@ -2426,4 +2545,39 @@ class HQDataV2
         return stockItem;
     }
 }
+
+//分时图缓存
+class MinuteDataCache
+{
+    static MapData=new Map();   //key=symbol  Value:{ Data, Time: }
+    static Enable=true;
+    static VaildTime=1000*60;   //数据有效时间 ms
+
+    static GetCache(symbol)
+    {
+        if (!MinuteDataCache.Enable) return null;
+
+        if (!MinuteDataCache.MapData.has(symbol)) return null;
+
+        var item=MinuteDataCache.MapData.get(symbol);
+        var now=new Date().getTime();
+        if (now-item.Time>MinuteDataCache.VaildTime) //超时了 删掉
+        {
+            MinuteDataCache.MapData.delete(symbol);
+            return null;
+        }
+
+        return item.Data;
+    }
+
+    static UpdateCache(stock)
+    {
+        if (!MinuteDataCache.Enable) return;
+        
+        MinuteDataCache.MapData.set(stock.Symbol, { Data:stock, Time:new Date().getTime() });
+    }
+}
+
+
+
 
