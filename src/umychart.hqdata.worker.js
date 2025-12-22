@@ -867,6 +867,7 @@ class HQDataV2
             var volBase=1;
             var upperSymbol=stock.Symbol.toUpperCase();
             if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol)) volBase=100;
+            if (MARKET_SUFFIX_NAME.IsSHSZ(upperSymbol)) volBase=100;
             if (IFrameSplitOperator.IsNonEmptyArray(stockItem[dataName]) && stockItem.prec>0)
             {
                 var yClose=parseFloat(stockItem.prec);
@@ -1674,6 +1675,8 @@ class HQDataV2
             Date: HQDataV2.StringToDateNumber(arySrcValue[30]),
             Time: HQDataV2.StringToTimeNumber(arySrcValue[31]),
         };
+
+        if (!IFrameSplitOperator.IsPlusNumber(item.Price)) item.Price=item.Close;
 
         if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
         {

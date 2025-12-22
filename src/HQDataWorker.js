@@ -1,5 +1,5 @@
 
-importScripts("../include/hqchart/umychart.js","umychart.hqdata.worker.js")
+importScripts("../include/hqchart/umychart.js","umychart.hqdata.worker.js","RequestProxy.js")
 
 
 chrome.runtime.onInstalled.addListener(({ reason }) => 
@@ -8,70 +8,22 @@ chrome.runtime.onInstalled.addListener(({ reason }) =>
     {
         
     }
+
+
+    var proxy=new RequestProxy();
+    proxy.Instal();
 });
 
-
-var rules = 
+chrome.runtime.onStartup.addListener((details)=>
 {
-    removeRuleIds: [1],
-    addRules: 
-    [
-        {
-            id: 1,
-            priority: 1,
-            condition: 
-            {
-                urlFilter: 'hq.sinajs.cn/*',
-                // domains: ['pic.ibaotu.com'],
-            },
-            action: 
-            {
-                type: "modifyHeaders",
-                requestHeaders: 
-                [
-                    {
-                        header: "Referer",
-                        operation: "set",
-                        value: "https://vip.stock.finance.sina.com.cn/"
-                    },
-                ],
-            }
-        }
-    ]
-
-};
-
-modifyHeaderIfNecessary();
-
-function modifyHeaderIfNecessary() 
-{
-    chrome.declarativeNetRequest.updateDynamicRules(rules, () => 
-    {
-        if (chrome.runtime.lastError) 
-        {
-            console.error(chrome.runtime.lastError);
-        } 
-        else 
-        {
-            chrome.declarativeNetRequest.getDynamicRules(rules => console.log(rules));
-        }
-    });
-}
-
+    var proxy=new RequestProxy();
+    proxy.Instal();
+})
 
 
 var g_HQChartDataService=new HQChartDataService();
 g_HQChartDataService.Create();
 
-//g_HQChartDataService.SubscribePool.push({ Type:1});
-
-/*
-var subscribeItem=new HQSubscribe()
-subscribeItem.Type=1;
-subscribeItem.WindowID="dddd";
-subscribeItem.PageID="AAAA";
-subscribeItem.ArySymbol=["601006.sh","000858.sz","300750.sz"];
-*/
 
 /*
 var item=new HQRequestItem()
@@ -80,14 +32,9 @@ item.ArySymbol=[{ Symbol:"AU0.shfe" }, { Symbol:"601006.sh" }];
 */
 
 
-
-
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
 item.ArySymbol=[ { Symbol:"AU2602.shfe"}, { Symbol:"002594.sz"}, { Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  ];
-
-
-
 
 
 
