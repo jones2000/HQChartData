@@ -22,6 +22,8 @@ var JSCHART_DATA_TYPE_ID=
     DETAIL_FULL_DATA_ID:5,    //成交明细 全部
     DETAIL_PRICE_ID:6,        //分价表
 
+    CODE_LIST_ID:7,           //码表
+
     KLINE_DAY_DATA_ID:100,        //日K线
     KLINE_MIN_DATA_ID:101,        //分钟K
     
@@ -41,16 +43,16 @@ var JSCHART_SERVER_MSG_ID=
 }
 
 
-function HQRequestItem()
+class HQRequestItem
 {
-    this.Type=0;
-    this.ID=null;
-    this.PortID=null;
+    Type=0;
+    ID=null;
+    PortID=null;
 
-    this.ArySymbol=[];  //{ Symbol:, 参数: .... }
+    ArySymbol=[];  //{ Symbol:, 参数: .... }
 
-    this.Callback=null;     //数据到达回调
-    this.ExtendData=null;   //扩展数据
+    Callback=null;     //数据到达回调
+    ExtendData=null;   //扩展数据
 }
 
 class HQChartDataService
@@ -150,6 +152,7 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.DETAIL_DATA_ID:
             case JSCHART_DATA_TYPE_ID.DETAIL_FULL_DATA_ID:
             case JSCHART_DATA_TYPE_ID.DETAIL_PRICE_ID:
+            case JSCHART_DATA_TYPE_ID.CODE_LIST_ID:
                 var bFind=false;
                 for(var i=0;i<this.RequestPool.length;++i)
                 {
@@ -222,6 +225,11 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.DETAIL_PRICE_ID:
                 var reqData={ Request:item };
                 this.RequestStockDetailPrice(reqData);
+                break;
+
+            case JSCHART_DATA_TYPE_ID.CODE_LIST_ID: //码表
+                var reqData={ Request:item };
+                this.RequestCodeList(reqData);
                 break;
         }
        
@@ -454,6 +462,16 @@ class HQChartDataService
             this.RecvStockDetail(recv, reqData);
         });
     }
+
+
+    RequestCodeList(reqData)
+    {
+        var request=reqData.Request;
+        var aryData=StockCodeList.GetInstance().GetStockList();
+        var data={ AryStock:aryData, Code:0 };
+
+        this.SendHQData(request, data);
+    }
 }
 
 
@@ -468,6 +486,17 @@ class HQDataV2
         {
             var item=arySymbol[i];
             var upperSymbol=item.Symbol.toUpperCase();
+            
+            if (item.Cache===true)
+            {
+                var minData=MinuteDataCache.GetCache(item.Symbol);
+                if (minData)
+                {
+                    result.AryData.push({ Symbol:item.Symbol, Stock:minData, Code:0 });
+                    continue;
+                }
+            }
+           
             var recvData=null;
             if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol) || MARKET_SUFFIX_NAME.IsHK(upperSymbol))
             {
@@ -483,6 +512,10 @@ class HQDataV2
                 //else recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
 
                 recvData=await HQDataV2.RequestMinute_Futrues_SINA({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestMinute_Stock_SINA({Request:{ ArySymbol:[item]}});
             }
             
             if (recvData)
@@ -526,6 +559,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
 
             if (recvData)
             {
@@ -558,6 +595,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 recvData=await HQDataV2.RequestKLine_Minute_Futrues_SINA({Request:{ ArySymbol:[item]}});
@@ -586,7 +627,7 @@ class HQDataV2
             {
                 aryQQ.push(item);
             }
-            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
             {
                 arySINA.push(item);
             }
@@ -632,6 +673,10 @@ class HQDataV2
             if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol))
             {
                 recvData=await HQDataV2.RequestDetail_QQ({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestStockDetail_SINA({Request:{ ArySymbol:[item]}});
             }
             else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) )
             {
@@ -751,6 +796,11 @@ class HQDataV2
                 const recv = await response.json();
 
                 var stockItem=HQDataV2.JsonToMinuteData_QQ(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+                if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+                {
+                    var aryMinute=HQTradeTime.FillMinuteJsonData(stockItem.Symbol, stockItem.YClose, stockItem.Data);
+                    stockItem.Data=aryMinute;
+                }
                 result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
             }
             catch(error)
@@ -866,8 +916,8 @@ class HQDataV2
             var stockItem=recv.data[symbolInfo.FixedSymbol];
             var volBase=1;
             var upperSymbol=stock.Symbol.toUpperCase();
-            if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol)) volBase=100;
             if (MARKET_SUFFIX_NAME.IsSHSZ(upperSymbol)) volBase=100;
+            if (MARKET_SUFFIX_NAME.IsSHStockSTAR(stock.Symbol)) volBase=1;
             if (IFrameSplitOperator.IsNonEmptyArray(stockItem[dataName]) && stockItem.prec>0)
             {
                 var yClose=parseFloat(stockItem.prec);
@@ -1371,6 +1421,12 @@ class HQDataV2
 
         //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine?symbol=FU2109
         Minute_Futrues:{Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine" },
+        
+        //https://cn.finance.sina.com.cn/minline/getMinlineData?symbol=bj920000&version=7.11.0&callback=var%20t1bj920000=&dpc=1
+        Minute_Stock:{ Url:"https://cn.finance.sina.com.cn/minline/getMinlineData"},
+
+
+        Detail_Stock:{ Realtime:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/view/CN_TransListV2.php"} },
     }
 
     //代码
@@ -1394,6 +1450,10 @@ class HQDataV2
             MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol))    
         {   //国内期货
             fixedSymbol=`nf_${JSChart.GetShortSymbol(symbol)}`;
+        }
+        else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+        {
+            fixedSymbol=`bj${JSChart.GetShortSymbol(symbol)}`;
         }
 
         return fixedSymbol;
@@ -1613,7 +1673,7 @@ class HQDataV2
 
         var symbol=symbolInfo.MapSymbol.get(value).Symbol;
         var upperSymbol=symbol.toUpperCase();
-        if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol)) 
+        if (MARKET_SUFFIX_NAME.IsSH(upperSymbol) || MARKET_SUFFIX_NAME.IsSZ(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol)) 
             return HQDataV2.JsonToStockItem_StockA_SINA(symbol, strContent);
         else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol)) 
             return HQDataV2.JsonToStockItem_StockHK_SINA(symbol,strContent);
@@ -2016,6 +2076,162 @@ class HQDataV2
         return stock;
     }
 
+
+    //股票分时图
+    static async RequestMinute_Stock_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToSINASymbol(symbol);
+
+            try
+            {
+                var recvData=await HQDataV2.RequestStockRealtimeData_SINA({ Request:{ ArySymbol:[{Symbol:symbol}]} });
+                if (recvData && IFrameSplitOperator.IsNonEmptyArray(recvData.AryData) && recvData.AryData[0])
+                {
+                    var baseData=recvData.AryData[0];
+
+                    //https://cn.finance.sina.com.cn/minline/getMinlineData?symbol=bj920000&version=7.11.0&callback=var%20t1bj920000=&dpc=1
+                    var url=`${HQDataV2.SINA.Minute_Stock.Url}?symbol=${fixedSymbol}&version=7.11.0&dpc=1`;
+                    const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                    const recv = await response.json();
+
+                    var stockItem=HQDataV2.JsonToMinuteStockData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol, Data:baseData });
+                    var aryMinute=HQTradeTime.FillMinuteJsonData(stockItem.Symbol, stockItem.YClose, stockItem.Data);
+                    stockItem.Data=aryMinute;
+                    result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+                }
+                else
+                {
+                    result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+                }
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToMinuteStockData_SINA(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Name:symbolInfo.FixedSymbol, Data:[] };
+
+        if (!recv || !recv.result || !IFrameSplitOperator.IsNonEmptyArray(recv.result.data)) return stock;
+       
+        if (IFrameSplitOperator.IsNumber(symbolInfo.Data.YClose)) stock.YClose=symbolInfo.Data.YClose;
+        if (IFrameSplitOperator.IsNumber(symbolInfo.Data.Date)) stock.Date=symbolInfo.Data.Date;
+        if (symbolInfo.Data.Name) stock.Name=symbolInfo.Data.Name;
+
+        var date=stock.Date;
+        var aryData=recv.result.data;
+        var volBase=100;
+        for(var i=0; i<aryData.length; ++i)
+        {
+            var item=aryData[i];
+
+            var time=parseInt(HQDataV2.StringToTimeNumber(item.m)/100);
+            var price=parseFloat(item.p);
+            var avPrice=parseFloat(item.avg_p);
+            var vol=parseFloat(item.v);
+            var minItem={ Date:date, Time:time, Price:price, Vol:vol, Amount:null, AvPrice:avPrice };
+
+            stock.Data.push(minItem);
+        }
+
+        return stock;
+    }
+
+    //成交明细
+    static async RequestStockDetail_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToSINASymbol(symbol);
+            var count=50;
+            if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
+
+            //var url="https://proxy.finance.qq.com/ifzqgtimg/appstock/app/dealinfo/getMingxiV2?code=sz000547&limit=20&direction=1";
+            var url=`${HQDataV2.SINA.Detail_Stock.Realtime.Url}?num=${50}&symbol=${fixedSymbol}&rn=${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.text();
+
+                var stockItem=HQDataV2.JsonToStockDetailData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+
+                var realtimeData=await HQDataV2.RequestStockRealtimeData_SINA({Request:{ ArySymbol:[{ Symbol:symbol}]}});
+                if (IFrameSplitOperator.IsNonEmptyArray(realtimeData.AryData) && realtimeData.AryData[0])
+                {
+                    var subItem=realtimeData.AryData[0];
+                    if (subItem.Symbol==symbol)
+                    {
+                        if (IFrameSplitOperator.IsNumber(subItem.YClose)) stockItem.YClose=subItem.YClose;
+                        if (IFrameSplitOperator.IsNumber(subItem.Date)) stockItem.Date=subItem.Date;
+                    }
+                }
+
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToStockDetailData_SINA(recv, symbolInfo)
+    {
+        var stockItem={ Symbol:symbolInfo.Symbol, Date:null, Data:[] };
+
+        const regex = /Array\(([\s\S]*?)\)/g;
+        const matches = Array.from(recv.matchAll(regex));
+
+        if (!matches || !IFrameSplitOperator.IsNonEmptyArray(matches)) return stockItem;
+
+        for(var i=0;i<matches.length;++i)
+        {
+            var matchItem=matches[i];
+            if (!matchItem[1]) continue;
+            var strContent=matchItem[1];
+            var aryStr=strContent.split(",");
+
+            var strValue=aryStr[0].trim().replace(/^'|'$/g, '');
+            var time=parseInt(HQDataV2.StringToTimeNumber(strValue));
+
+            var strValue=aryStr[1].trim().replace(/^'|'$/g, '');
+            var vol=parseFloat(strValue);
+
+            var strValue=aryStr[2].trim().replace(/^'|'$/g, '');
+            var price=parseFloat(strValue);
+
+            var strValue=aryStr[3].trim().replace(/^'|'$/g, '');
+            var type="";
+            if (strValue=="UP") type="B";
+            else if (strValue=="DOWN") type="S";
+
+            stockItem.Data.push({ Time:time, Price:price, Vol:vol, Type:type, ID:time })
+        }
+
+        return stockItem;
+    }
+
+
     ////////////////////////////////////////////////////////////////////////////////////
     // 东方财富
     static EASTMONEY=
@@ -2073,7 +2289,7 @@ class HQDataV2
         if (recv.code!==0) return null;
 
         var stock={ Symbol:symbolInfo.Symbol, Data:[] };  
-        var upperSymbol = stock.Symbol.toLocaleUpperCase(); //转成大写
+        var upperSymbol = stock.Symbol.toUpperCase(); //转成大写
         if (recv && recv.result && IFrameSplitOperator.IsNonEmptyArray(recv.result.data))
         {
             var aryData=recv.result.data;
@@ -2126,7 +2342,7 @@ class HQDataV2
             else if (["HSI","HSCEI"].includes(shortSymbol)) marketID=100;
             else marketID=124;      //指数
         }
-        else if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol))
+        else if (MARKET_SUFFIX_NAME.IsSZ(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
         {
             marketID=0;
         }
@@ -2343,7 +2559,7 @@ class HQDataV2
             if (stock.Symbol) upperSymbol=stock.Symbol.toUpperCase();
             var bFutrues=MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol);
             var volBase=1;
-            if (MARKET_SUFFIX_NAME.IsSHSZ(upperSymbol)) volBase=100;
+            if (MARKET_SUFFIX_NAME.IsSHSZ(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol)) volBase=100;
             if (IFrameSplitOperator.IsNonEmptyArray(data.klines))
             {
                 for(var i=0;i<data.klines.length; ++i)
@@ -2579,6 +2795,92 @@ class MinuteDataCache
         
         MinuteDataCache.MapData.set(stock.Symbol, { Data:stock, Time:new Date().getTime() });
     }
+}
+
+
+
+//分时图交易时间区间修改
+class HQTradeTime
+{
+    static Inital()
+    {
+        JSChart.GetMinuteTimeStringData().CreateSHSZData=()=>{ return HQTradeTime.CreateSHSZData(); }  //替换交易时间段
+        JSChart.GetMinuteTimeStringData().CreateBJData=()=>{ return HQTradeTime.CreateSHSZData(); }
+    }
+
+    static CreateSHSZData()
+    {
+        var minuteStringData=JSChart.GetMinuteTimeStringData();
+
+        const TIME_SPLIT =
+        [
+            { Start: 930, End: 1130 },
+            { Start: 1300, End: 1500 }
+        ];
+
+        return minuteStringData.CreateTimeData(TIME_SPLIT);
+    }
+
+    //把不连续的分时数据转成连续的分时数据 (跨天的不支持) 
+    static FillMinuteJsonData(symbol, yClose, aryMinute)
+    {
+        if (!symbol) return aryMinute;
+        if (!IFrameSplitOperator.IsNonEmptyArray(aryMinute)) return aryMinute;
+
+        var lastItem=aryMinute[aryMinute.length-1];
+        var aryTime=g_MinuteTimeStringData.GetTimeData(symbol);
+        if (!IFrameSplitOperator.IsNonEmptyArray(aryTime)) return aryMinute;
+
+        var mapMinute=new Map();
+        for(var i=0;i<aryTime.length;++i)
+        {
+            var time=aryTime[i];
+            if (time>lastItem.Time)
+                break;
+
+            mapMinute.set(time, null);
+        }
+
+        for(var i=0;i<aryMinute.length;++i)
+        {
+            var item=aryMinute[i];
+            if (!mapMinute.has(item.Time)) continue;
+
+            mapMinute.set(item.Time, item);
+        }
+
+        var aryData=[];
+        for(var mapItem of mapMinute)
+        {
+            var item=mapItem[1];
+            var time=mapItem[0];
+
+            if (item) aryData.push(item);
+            else aryData.push({ Time:time });
+        }
+
+        var prePrice=yClose, preAvPrice=yClose;
+        for(var i=0; i<aryData.length; ++i)
+        {
+            var item=aryData[i];
+            if (!IFrameSplitOperator.IsNumber(item.Price))
+            {
+                item.Price=prePrice;
+                item.AvPrice=preAvPrice;
+                item.Vol=0;
+                item.Amount=0;
+            }
+            else
+            {
+                prePrice=item.Price;
+                preAvPrice=item.AvPrice;
+            }
+        }
+
+        return aryData;
+    }
+
+    
 }
 
 

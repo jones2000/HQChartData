@@ -32,7 +32,7 @@ class RequestProxy
     }
 
 
-    Instal()
+    Install()
     {
         this.InstallProxy();
         this.InstallInjectHeader();
