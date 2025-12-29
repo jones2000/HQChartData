@@ -26,20 +26,8 @@ var g_HQChartDataService=new HQChartDataService();
 g_HQChartDataService.Create();
 
 
-StockCodeList.GetInstance().DownloadSHSZIndex().then((res)=>
-{
-    console.log(`[StockCodeList::DownloadSHSZIndex] Count=${res.Count}`);
-})
+StockCodeList.GetInstance().Download();
 
-StockCodeList.GetInstance().DownloadSHSZ().then((res)=>
-{
-    console.log(`[StockCodeList::DownloadSHSZ] Count=${res.Count}`);
-})
-
-StockCodeList.GetInstance().DownloadSZIndex().then((res)=>
-{
-    console.log(`[StockCodeList::DownloadSZIndex] Count=${res.Count}`);
-});
 
 
 /*

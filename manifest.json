@@ -2,7 +2,7 @@
 {
     "manifest_version": 3,
     "name": "HQChart行情数据插件",
-    "version": "1.0.39",
+    "version": "1.0.43",
     "background":
     {
         "service_worker": "src/HQDataWorker.js"
@@ -42,7 +42,11 @@
         "https://finance.pae.baidu.com/*",
         "http://www.szse.cn/*",
         "https://vip.stock.finance.sina.com.cn/*",
-        "https://cn.finance.sina.com.cn/*"
+        "https://cn.finance.sina.com.cn/*",
+        "http://www.cffex.com.cn/*",
+        "https://www.shfe.com.cn/*",
+        "https://quotation.czce.com.cn/*",
+        "https://www.czce.com.cn/*"
     ],
 
 

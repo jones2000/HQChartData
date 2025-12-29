@@ -2022,6 +2022,8 @@ class HQDataV2
                 const recv = await response.text();
 
                 var stockItem=HQDataV2.JsonToMinuteFutruesData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+                var aryMinute=HQTradeTime.FillMinuteJsonData(stockItem.Symbol, stockItem.YClose, stockItem.Data);
+                stockItem.Data=aryMinute;
                 result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
             }
             catch(error)
@@ -2227,6 +2229,8 @@ class HQDataV2
 
             stockItem.Data.push({ Time:time, Price:price, Vol:vol, Type:type, ID:time })
         }
+
+        stockItem.Data.sort((left, right)=>{ return left.Time-right.Time; });
 
         return stockItem;
     }
@@ -2827,17 +2831,14 @@ class HQTradeTime
         if (!symbol) return aryMinute;
         if (!IFrameSplitOperator.IsNonEmptyArray(aryMinute)) return aryMinute;
 
-        var lastItem=aryMinute[aryMinute.length-1];
         var aryTime=g_MinuteTimeStringData.GetTimeData(symbol);
         if (!IFrameSplitOperator.IsNonEmptyArray(aryTime)) return aryMinute;
 
+        
         var mapMinute=new Map();
         for(var i=0;i<aryTime.length;++i)
         {
             var time=aryTime[i];
-            if (time>lastItem.Time)
-                break;
-
             mapMinute.set(time, null);
         }
 
@@ -2859,7 +2860,19 @@ class HQTradeTime
             else aryData.push({ Time:time });
         }
 
+        for(var i=aryData.length-1;i>=0;--i)
+        {
+            var item=aryData[i];
+            if (IFrameSplitOperator.IsNumber(item.Price))
+            {
+                aryData.length=i+1;
+                break;
+            }
+        }
+
+        var preDate=aryMinute[0].Date;
         var prePrice=yClose, preAvPrice=yClose;
+        var preItem=null;
         for(var i=0; i<aryData.length; ++i)
         {
             var item=aryData[i];
@@ -2868,12 +2881,15 @@ class HQTradeTime
                 item.Price=prePrice;
                 item.AvPrice=preAvPrice;
                 item.Vol=0;
-                item.Amount=0;
+                item.Amount=null;
+                item.Date=preDate;
             }
             else
             {
                 prePrice=item.Price;
                 preAvPrice=item.AvPrice;
+                preItem=item;
+                preDate=item.Date;
             }
         }
 
