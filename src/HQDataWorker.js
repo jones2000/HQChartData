@@ -25,7 +25,6 @@ HQTradeTime.Inital();
 var g_HQChartDataService=new HQChartDataService();
 g_HQChartDataService.Create();
 
-
 StockCodeList.GetInstance().Download();
 
 

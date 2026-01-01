@@ -55,14 +55,63 @@ class StockCodeList
     
 
     MapStock=new Map(); //key=symbol  vallue:{ Symbol, ShortSymbol, Name, Type:1=股票 2=指数 3=期货  }
+    SaveKey="CodeList_110C5580-6415-4B01-87B6-E6D871925773";
 
     static GetInstance()
     {
         return g_StockCodeList;
     }
 
+    async LoadLocalCache()
+    {
+        try
+        {
+            var localData=await chrome.storage.local.get(this.SaveKey);
+            if (localData && localData[this.SaveKey])
+            {
+                var strContent=localData[this.SaveKey];
+                var data=JSON.parse(strContent);
+                if (data && IFrameSplitOperator.IsNonEmptyArray(data.Data))
+                {
+                    for(var i=0;i<data.Data.length;++i)
+                    {
+                        var item=data.Data[i];
+                        this.MapStock.set(item.Key, item.Value);
+                    }
+                }
+            }
+
+            console.log(`[StockCodeList::Load] Count=${this.MapStock.size}`);
+        }
+        catch(error)
+        {
+            console.warn("[StockCodeList::LoadLocalCache] error", error);
+        }
+    }
+
+    Save()
+    {
+        var strContent="";
+        if (this.MapStock.size>0)
+        {
+            var aryData=[];
+            for(var mapItem of this.MapStock)
+            {
+                aryData.push({Key:mapItem[0], Value:mapItem[1]})
+            }
+            strContent=JSON.stringify({ Data:aryData });
+            console.log(`[StockCodeList::Save] Count=${aryData.length}`);
+        } 
+
+        var obj={ };
+        obj[this.SaveKey]=strContent;
+        chrome.storage.local.set(obj);
+    }
+
     async Download()
     {
+        await this.LoadLocalCache();
+
         this.DownloadFutures_CZCE().then((res)=>
         {
             console.log(`[StockCodeList::DownloadFutures_CZCE] Count=${res.Count}`);
@@ -103,6 +152,7 @@ class StockCodeList
         var result=await this.DownloadSHSZ_HK_Stock();
         console.log(`[StockCodeList::DownloadSHSZ_HK_Stock] Count=${result.Count}`);
 
+        this.Save();
     }
 
     GetStockList()
@@ -367,32 +417,39 @@ class StockCodeList
     async DownloadFutrues_SHFE()
     {
         var result={ Count:0 };
-        try
+        var dateTime=new Date();
+        for(var i=0; i<10; ++i)
         {
-            var now=new Date();
-            var date=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate();
-            //https://www.shfe.com.cn/data/busiparamdata/future/ContractBaseInfo20251201.dat?params=1766651277006
-            var url=`${StockCodeList.FUTURES_SHFE.Url}/ContractBaseInfo${date}.dat?params=${new Date().getTime()}`;
-            const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
-            const recv=await response.json();
-
-            var aryData=StockCodeList.JsonToFutrues_SHFE(recv);
-
-            if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+            try
             {
-                for(var j=0;j<aryData.length;++j)
-                {
-                    var item=aryData[j];
-                    this.MapStock.set(item.Symbol, item);
-                    ++result.Count;
-                }
-            }
-            
-        }
-        catch(error)
-        {
+                var date=dateTime.getFullYear()*10000+(dateTime.getMonth()+1)*100+dateTime.getDate();
+                //https://www.shfe.com.cn/data/busiparamdata/future/ContractBaseInfo20251201.dat?params=1766651277006
+                var url=`${StockCodeList.FUTURES_SHFE.Url}/ContractBaseInfo${date}.dat?params=${new Date().getTime()}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv=await response.json();
 
+                var aryData=StockCodeList.JsonToFutrues_SHFE(recv);
+
+                if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+                {
+                    for(var j=0;j<aryData.length;++j)
+                    {
+                        var item=aryData[j];
+                        this.MapStock.set(item.Symbol, item);
+                        ++result.Count;
+                    }
+                }
+
+                break;
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::DownloadFutrues_SHFE] error", error);
+            }
+
+            dateTime.setDate(dateTime.getDate()-1);
         }
+        
 
         return result;
     }

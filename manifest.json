@@ -2,7 +2,7 @@
 {
     "manifest_version": 3,
     "name": "HQChart行情数据插件",
-    "version": "1.0.43",
+    "version": "1.0.46",
     "background":
     {
         "service_worker": "src/HQDataWorker.js"
@@ -52,6 +52,8 @@
 
     "permissions":
     [
-        "declarativeNetRequest"
+        "declarativeNetRequest",
+        "storage",
+        "unlimitedStorage"
     ]
 }
