@@ -6,11 +6,19 @@ class StockCodeList
 {
 
     static BAIDU={ SHSZList:{ Url:"https://finance.pae.baidu.com/selfselect/getmarketrank"} };
+    
 
     //http://www.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=1812_zs&TABKEY=tab1&PAGENO=5&random=0.9125913218422376
     static SZSE={ SZIndexList:{ Url:"http://www.szse.cn/api/report/ShowReport/data"}};
 
-    static SINA={ SHSZIndexList:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple?page=1&num=80&sort=symbol&asc=1&node=dpzs&_s_r_a=setlen"}}
+    static SINA=
+    { 
+        SHSZIndexList:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple?page=1&num=80&sort=symbol&asc=1&node=dpzs&_s_r_a=setlen"},
+        //https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=3&num=40&sort=symbol&asc=1&node=hs_bjs&symbol=&_s_r_a=page
+        BJStock:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData" },
+
+        HKStockConnect:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"},
+    };
 
     //中金所
     static FUTURES_CFFEX={ AryUrl:
@@ -112,6 +120,11 @@ class StockCodeList
     {
         await this.LoadLocalCache();
 
+        this.DownloadBJStock().then((res)=>
+        {
+            console.log(`[StockCodeList::DownloadBJStock] Count=${res.Count}`);
+        });
+
         this.DownloadFutures_CZCE().then((res)=>
         {
             console.log(`[StockCodeList::DownloadFutures_CZCE] Count=${res.Count}`);
@@ -194,7 +207,7 @@ class StockCodeList
             }
             catch(error)
             {
-                var nnnn=10;
+                console.warn("[StockCodeList::DownloadSHSZ] error", error);
             }
         }
 
@@ -228,6 +241,74 @@ class StockCodeList
         return aryData;
     }
 
+    //北交所股票
+    async DownloadBJStock()
+    {
+        var count=10, pageSize=40;
+        var result={ Count:0 };
+        for(var i=0;i<count;++i)
+        {
+            try
+            {
+                //https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?" }
+                var url=`${StockCodeList.SINA.BJStock.Url}?page=${i+1}&num=${pageSize}&sort=symbol&asc=1&node=hs_bjs&symbol=&_s_r_a=page`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json();
+
+                var aryData=StockCodeList.JsonToStockData_SINA(recv);
+                if (!aryData) continue;
+
+                if (!IFrameSplitOperator.IsNonEmptyArray(aryData)) break;
+                
+                for(var j=0;j<aryData.length;++j)
+                {
+                    var item=aryData[j];
+                    this.MapStock.set(item.Symbol, item);
+                    ++result.Count;
+                }
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::DownloadBJStock] error", error);
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToStockData_SINA(recv)
+    {
+        if (!IFrameSplitOperator.IsArray(recv)) return null;
+
+        var aryStock=[];
+        if (!IFrameSplitOperator.IsNonEmptyArray(recv)) return aryStock;
+       
+        const pattern = /^([a-zA-Z]+)([0-9]+)$/;
+        for(var i=0; i<recv.length; ++i)
+        {
+            var item=recv[i];
+            var name=item.name;
+            var shortSymbol=item.code;
+            var value=item.symbol;
+            var symbol=null;
+            var market=null;
+            const match = value.match(pattern);
+            if (!match || !match[1] || !match[2]) continue;
+            if (match[1]=="bj") 
+            {
+                symbol=`${shortSymbol}.bj`;
+                market="BJ";
+            }
+            else 
+                continue;
+
+
+            aryStock.push({ Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:1, Market:market });
+        }
+
+        return aryStock;
+    }
+
     //深证指数
     async DownloadSZIndex()
     {
@@ -255,7 +336,7 @@ class StockCodeList
             }
             catch(error)
             {
-
+                console.warn("[StockCodeList::DownloadSZIndex] error", error);
             }
         }
 
@@ -808,21 +889,61 @@ class StockCodeList
         for(var i=0;i<aryData.length;++i)
         {
             var item=aryData[i];
-            if (this.MapStock.has(item.Symbol))
+            var stockItem=null, hkStockItem=null;
+            if (this.MapStock.has(item.Symbol)) stockItem=this.MapStock.get(item.Symbol);
+            if (this.MapStock.has(item.HKSymbol)) hkStockItem=this.MapStock.get(item.HKSymbol);
+
+               
+            if (stockItem)
             {
-                var stockItem=this.MapStock.get(item.Symbol);
-                if (!stockItem.AryProperty) stockItem.AryProperty=[];
-                stockItem.AryProperty.push({ Name:"A+H", HKSymbol:item.HKSymbol, Symbol:item.Symbol });
+                var propertyItem={ Name:"A+H", SHSZ:{ Symbol:item.Symbol, Name:stockItem.Name}, HK:{ Symbol:item.HKSymbol, Name:null} };
+                if (hkStockItem) propertyItem.HK.Name=hkStockItem.Name;
+
+                if (!stockItem.AryProperty) 
+                {
+                    stockItem.AryProperty=[propertyItem];
+                }
+                else
+                {
+                    var bFind=false;
+                    for(var j=0;j<stockItem.AryProperty.length;++j)
+                    {
+                        if (stockItem.AryProperty[j].Name==propertyItem.Name) 
+                        {
+                            stockItem.AryProperty[j]=propertyItem;
+                            bFind=true;
+                            break;
+                        }
+                    }
+                    if (!bFind) stockItem.AryProperty.push(propertyItem);
+                }
                 
                 ++result.Count;
             }
-
-            if (this.MapStock.has(item.HKSymbol))
+            
+            if (hkStockItem)
             {
-                var stockItem=this.MapStock.get(item.HKSymbol);
-                if (!stockItem.AryProperty) stockItem.AryProperty=[];
-                stockItem.AryProperty.push({ Name:"A+H", HKSymbol:item.HKSymbol, Symbol:item.Symbol } );
+                var propertyItem={ Name:"A+H", SHSZ:{ Symbol:item.Symbol, Name:null},  HK:{ Symbol:item.HKSymbol, Name:hkStockItem.Name} };
+                if (stockItem) propertyItem.SHSZ.Name=stockItem.Name;
 
+                if (!hkStockItem.AryProperty) 
+                {
+                    hkStockItem.AryProperty=[];
+                }
+                else
+                {
+                    var bFind=false;
+                    for(var j=0;j<hkStockItem.AryProperty.length;++j)
+                    {
+                        if (hkStockItem.AryProperty[j].Name==propertyItem.Name) 
+                        {
+                            hkStockItem.AryProperty[j]=propertyItem;
+                            bFind=true;
+                            break;
+                        }
+                    }
+                    if (!bFind) hkStockItem.AryProperty.push(propertyItem);
+                }
                 ++result.Count;
             }
         }
