@@ -27393,6 +27393,7 @@ function IChartPainting()
         if (!this.IsShow || this.ChartFrame.IsMinSize) return;
         var bHScreen=(this.ChartFrame.IsHScreen===true);
         if (bHScreen) return;
+        if (!this.Data) return;
 
         var isMinute=this.IsMinuteFrame();
         var dataWidth=this.ChartFrame.DataWidth;
@@ -103005,6 +103006,26 @@ var MARKET_SUFFIX_NAME=
         return false;
     },
 
+    IsCFFEXOption:function(upperSymbol) //中金所股票期权
+    {
+        if (!upperSymbol) return false;
+        if (!this.IsCFFEX(upperSymbol)) return false;   
+        var shortSymbol=JSChart.GetShortSymbol(upperSymbol);
+        //MO2602-C-6300.cffex
+        var aryValue=shortSymbol.split("-");
+        if (!aryValue || aryValue.length!=3) return false;
+        
+        var strValue=aryValue[0];
+        const regex = /([a-zA-Z]+)(\d+)/;
+        const match = strValue.match(regex);
+        if (!match || !match[1] || !match[2]) return false;
+
+        var prefix=match[1];
+        if (["IM","IO","MO","HO"].includes(prefix)) return true;
+        
+        return true;
+    },
+
     IsDCE: function (upperSymbol) 
     {
         if (!upperSymbol) return false;
@@ -103066,6 +103087,24 @@ var MARKET_SUFFIX_NAME=
             }
 
             if (bMatch) return true;
+        }
+
+        return false;
+    },
+
+    //是否包含前缀
+    IsPrefixIncludes:function(symbol, aryPrefix)
+    {
+        if (!symbol) return false;
+        var shortSymbol=this.GetShortSymbol(symbol);
+        if (!shortSymbol) return false;
+        shortSymbol=shortSymbol.toUpperCase();
+
+        for(var i=0;i<aryPrefix.length;++i)
+        {
+            var strValue=aryPrefix[i];
+            if (!strValue) continue;
+            if (shortSymbol.search(strValue)===0) return true;
         }
 
         return false;
@@ -103220,11 +103259,11 @@ var MARKET_SUFFIX_NAME=
         return false;
     },
 
-    IsSHGEM:function(symbol)    //创业板(growth enterprise market) 30开头
+    IsSZGEM:function(symbol)    //创业板(growth enterprise market) 30开头
     {
         if (!symbol) return false;
         var upperSymbol=symbol.toUpperCase();
-        if (!this.IsSH(upperSymbol)) return false;
+        if (!this.IsSZ(upperSymbol)) return false;
         if (upperSymbol.charAt(0)=='3' && upperSymbol.charAt(1)=='0')
             return true;
         
@@ -103368,7 +103407,7 @@ var MARKET_SUFFIX_NAME=
     {
         if (!this.IsSHSZStockA(symbol)) return null;
         if (this.IsSHStockSTAR(symbol)) return {Max:0.2 , Min:-0.2};    //科创板 [20% - -20%]
-        if (this.IsSHGEM(symbol)) return { Max:0.2 , Min:-0.2};         //创业板 [20% - -20%]
+        if (this.IsSZGEM(symbol)) return { Max:0.2 , Min:-0.2};         //创业板 [20% - -20%]
         
         if (!name) return null;
         if (name.indexOf('ST')>=0) return { Max:0.05, Min:-0.05 }; //ST 股票 [5% - -5%]
@@ -103593,6 +103632,23 @@ var MARKET_SUFFIX_NAME=
         if (pos<=0) return symbol;
 
         return symbol.slice(0,pos);
+    },
+
+    SplitSymbol:function(symbol, format) //分析代码 返回对象
+    {
+        if (!format || !symbol) return null;
+        var shortSymbol=this.GetShortSymbol(symbol);
+        if (format=="A+D+")
+        {
+            var regex=/([a-zA-Z]+)(\d+)/;
+            var match=shortSymbol.match(regex);
+            if (!match || !match[1] || !match[2]) return null;
+            
+            return { AryString:[match[1], match[2]], ShortSymbol:shortSymbol, Symbol:symbol, Market:symbol.slice(shortSymbol.length) };
+        }
+
+
+        return null;
     }
 
 }

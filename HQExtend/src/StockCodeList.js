@@ -120,6 +120,8 @@ class StockCodeList
     {
         await this.LoadLocalCache();
 
+        //return;
+
         this.DownloadBJStock().then((res)=>
         {
             console.log(`[StockCodeList::DownloadBJStock] Count=${res.Count}`);

@@ -2,7 +2,7 @@
 {
     "manifest_version": 3,
     "name": "HQChart行情数据插件",
-    "version": "1.0.50",
+    "version": "1.0.52",
     "background":
     {
         "service_worker": "src/HQDataWorker.js"
@@ -30,19 +30,25 @@
     "host_permissions":
     [
         "https://hq.sinajs.cn/*",
+        "https://stock.finance.sina.com.cn/*",
+        "https://stock2.finance.sina.com.cn/*",
+        "https://vip.stock.finance.sina.com.cn/*",
+        "https://cn.finance.sina.com.cn/*",
+
         "https://web.ifzq.gtimg.cn/*",
         "https://ifzq.gtimg.cn/*",
-        "https://datacenter.eastmoney.com/*",
+        
         "https://sqt.gtimg.cn/*",
         "https://proxy.finance.qq.com/*",
         "https://stock.gtimg.cn/*",
+
         "https://push2his.eastmoney.com/*",
-        "https://stock2.finance.sina.com.cn/*",
         "https://futsseapi.eastmoney.com/*",
+        "https://datacenter.eastmoney.com/*",
+
         "https://finance.pae.baidu.com/*",
         "http://www.szse.cn/*",
-        "https://vip.stock.finance.sina.com.cn/*",
-        "https://cn.finance.sina.com.cn/*",
+       
         "http://www.cffex.com.cn/*",
         "https://www.shfe.com.cn/*",
         "https://quotation.czce.com.cn/*",
