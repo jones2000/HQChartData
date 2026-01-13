@@ -536,6 +536,10 @@ class HQDataV2
                 else recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
                 //recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsSHO(upperSymbol) || MARKET_SUFFIX_NAME.IsSZO(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestMinute_Option_SINA({Request:{ ArySymbol:[item]}});
+            }
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 //var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
@@ -548,6 +552,7 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestMinute_Stock_SINA({Request:{ ArySymbol:[item]}});
             }
+            
             
             if (recvData)
             {
@@ -1482,6 +1487,9 @@ class HQDataV2
 
         //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine?symbol=FU2109
         Minute_Futrues:{Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine" },
+
+        //https://stock.finance.sina.com.cn/futures/api/openapi.php/StockOptionDaylineService.getOptionMinline?symbol=CON_OP_10010448&random=1768229150586&callback=var%20t1CON_OP_10010448=
+        Minute_Option:{ Url:"https://stock.finance.sina.com.cn/futures/api/openapi.php/StockOptionDaylineService.getOptionMinline"},
         
         //https://cn.finance.sina.com.cn/minline/getMinlineData?symbol=bj920000&version=7.11.0&callback=var%20t1bj920000=&dpc=1
         Minute_Stock:{ Url:"https://cn.finance.sina.com.cn/minline/getMinlineData"},
@@ -2223,6 +2231,83 @@ class HQDataV2
             var position=parseFloat(aryData[4]);
             var minItem={ Date:date, Time:time, Price:price, Vol:vol, Amount:null, AvPrice:avPrice, Position:position };
             if (minItem.Time>2100) minItem.Date=preDate;
+
+            stock.Data.push(minItem);
+        }
+
+        return stock;
+    }
+
+    //期权分时图
+    static async RequestMinute_Option_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToSINASymbol(symbol);
+
+            //取最新的信息
+            var recvData=await HQDataV2.RequestStockRealtimeData_SINA({ Request:{ ArySymbol:[{Symbol:symbol}]} });
+            var stockItem=null;
+            if (!recvData || !IFrameSplitOperator.IsNonEmptyArray(recvData.AryData) && recvData.AryData[0])
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+                continue;
+            }
+
+            stockItem=recvData.AryData[0];
+            
+            //https://stock.finance.sina.com.cn/futures/api/openapi.php/StockOptionDaylineService.getOptionMinline?symbol=CON_OP_10010448&random=1768229150586&callback=var%20t1CON_OP_10010448=
+
+            var url=`${HQDataV2.SINA.Minute_Option.Url}?symbol=${fixedSymbol}&random=${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json()
+
+                var stockItem=HQDataV2.JsonToMinuteOptionData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol, Data:stockItem });
+                var aryMinute=HQTradeTime.FillMinuteJsonData(stockItem.Symbol, stockItem.YClose, stockItem.Data);
+                stockItem.Data=aryMinute;
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToMinuteOptionData_SINA(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Name:symbolInfo.FixedSymbol, Data:[] };
+
+        if (!recv || !recv.result || !IFrameSplitOperator.IsNonEmptyArray(recv.result.data)) return stock;
+       
+        if (IFrameSplitOperator.IsNumber(symbolInfo.Data.YClose)) stock.YClose=symbolInfo.Data.YClose;
+        if (IFrameSplitOperator.IsNumber(symbolInfo.Data.YFClose)) stock.YFClose=symbolInfo.Data.YFClose;
+        if (IFrameSplitOperator.IsNumber(symbolInfo.Data.Date)) stock.Date=symbolInfo.Data.Date;
+        if (symbolInfo.Data.Name) stock.Name=symbolInfo.Data.Name;
+
+        var date=stock.Date;
+        var aryData=recv.result.data;
+        for(var i=0; i<aryData.length; ++i)
+        {
+            var item=aryData[i];
+            if (item.d) date=HQDataV2.StringToDateNumber(item.d);
+
+            var time=parseInt(HQDataV2.StringToTimeNumber(item.i)/100);
+            var price=parseFloat(item.p);
+            var avPrice=parseFloat(item.a);
+            var vol=parseFloat(item.v);
+            var position=parseFloat(item.t);
+            var minItem={ Date:date, Time:time, Price:price, Vol:vol, Amount:null, AvPrice:avPrice, Position:position };
 
             stock.Data.push(minItem);
         }
