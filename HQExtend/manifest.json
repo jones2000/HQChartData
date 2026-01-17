@@ -2,7 +2,7 @@
 {
     "manifest_version": 3,
     "name": "HQChart行情数据插件",
-    "version": "1.0.54",
+    "version": "1.0.57",
     "background":
     {
         "service_worker": "src/HQDataWorker.js"
@@ -45,6 +45,7 @@
         "https://push2his.eastmoney.com/*",
         "https://futsseapi.eastmoney.com/*",
         "https://datacenter.eastmoney.com/*",
+        "https://push2.eastmoney.com/*",
 
         "https://finance.pae.baidu.com/*",
         "http://www.szse.cn/*",

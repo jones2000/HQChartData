@@ -540,6 +540,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestMinute_Option_SINA({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsSHFEOption(upperSymbol) || MARKET_SUFFIX_NAME.IsDCEOption(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCEOption(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestMinuteV2_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 //var id=HQDataV2.GetRoundID(2);  //随机去一个源请求
@@ -718,6 +722,10 @@ class HQDataV2
             {
                 //recvData=await HQDataV2.RequestKLine_Minute_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsSHO(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestOptionDetail_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 recvData=await HQDataV2.RequestDetail_EASTMONEY({Request:{ ArySymbol:[item]}});
@@ -747,6 +755,10 @@ class HQDataV2
                 recvData= await HQDataV2.RequestOptionList_SINA({Request:{ ArySymbol:[item]}});
             }
             else if (MARKET_SUFFIX_NAME.IsSHO(upperSymbol) || MARKET_SUFFIX_NAME.IsSZO(upperSymbol))
+            {
+                recvData= await HQDataV2.RequestOptionList_SINA({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol))
             {
                 recvData= await HQDataV2.RequestOptionList_SINA({Request:{ ArySymbol:[item]}});
             }
@@ -1496,7 +1508,11 @@ class HQDataV2
 
         Detail_Stock:{ Realtime:{ Url:"https://vip.stock.finance.sina.com.cn/quotes_service/view/CN_TransListV2.php"} },
 
-        Option_List:{ CFFEX:{ Url:"https://stock.finance.sina.com.cn/futures/api/openapi.php/OptionService.getOptionData"}}
+        Option_List:
+        { 
+            CFFEX:{ Url:"https://stock.finance.sina.com.cn/futures/api/openapi.php/OptionService.getOptionData"},
+            SHFE:{ Url:"https://stock.finance.sina.com.cn/futures/api/openapi.php/OptionService.getOptionData"}
+        }
     }
 
     //代码
@@ -1516,7 +1532,7 @@ class HQDataV2
         {
             fixedSymbol=`hk${JSChart.GetShortSymbol(symbol)}`;
         }
-        else if (MARKET_SUFFIX_NAME.IsCFFEXOption(upperSymbol))  //指数期权 https://hq.sinajs.cn/list=P_OP_io2601C4000
+        else if (MARKET_SUFFIX_NAME.IsCFFEXOption(upperSymbol) || MARKET_SUFFIX_NAME.IsDCEOption(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCEOption(upperSymbol))  //指数期权 https://hq.sinajs.cn/list=P_OP_io2601C4000
         {
             //MO2602-C-6300.cffex
             var aryValue=fixedSymbol.split("-");
@@ -1534,6 +1550,21 @@ class HQDataV2
         else if (MARKET_SUFFIX_NAME.IsSHO(upperSymbol) || MARKET_SUFFIX_NAME.IsSZO(upperSymbol)) //ETF期权
         {
             fixedSymbol=`CON_OP_${JSChart.GetShortSymbol(symbol)}`;
+        }
+        else if (MARKET_SUFFIX_NAME.IsSHFEOption(upperSymbol))
+        {
+            //m2605-C-2400.shfe
+            var aryValue=fixedSymbol.split("-");
+
+            var strValue=aryValue[0];
+            const regex = /([a-zA-Z]+)(\d+)/;
+            const match = strValue.match(regex);
+            
+            var prefix=match[1];
+            prefix=prefix.toLowerCase();
+
+            //P_OP_m2605C2400
+            fixedSymbol=`P_OP_${prefix}${match[2]}${aryValue[1]}${aryValue[2]}`;
         }
         else if (MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol)||
             MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol))    
@@ -1766,6 +1797,8 @@ class HQDataV2
             return HQDataV2.JsonToStockItem_StockA_SINA(symbol, strContent);
         else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol)) 
             return HQDataV2.JsonToStockItem_StockHK_SINA(symbol,strContent);
+        else if (MARKET_SUFFIX_NAME.IsSHFEOption(upperSymbol) || MARKET_SUFFIX_NAME.IsDCEOption(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCEOption(upperSymbol))
+            return HQDataV2.JsonToStockItem_SHFEOption_SINA(symbol,strContent);
         else if (MARKET_SUFFIX_NAME.IsCZCE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || 
             MARKET_SUFFIX_NAME.IsGZFE(upperSymbol) || MARKET_SUFFIX_NAME.IsINE(upperSymbol)) 
             return HQDataV2.JsonToStockItem_CNFutrues_SINA(symbol,strContent);
@@ -2006,7 +2039,7 @@ class HQDataV2
     //中金所期权
     static JsonToStockItem_CFFEXOption_SINA(symbol, strContent)
     {
-         var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
         if (!match || !match[1]) return null;
 
         var strValue=match[0];
@@ -2047,6 +2080,70 @@ class HQDataV2
             ReleaseDate:HQDataV2.StringToDateNumber(arySrcValue[46]),
             Days:HQDataV2.StringToNumber(arySrcValue[47]),          //剩余天数
         };
+
+        var date=new Date(arySrcValue[32]);
+        item.Date=date.getFullYear()*10000+(date.getMonth()+1)*100+date.getDate();
+        item.Time=date.getHours()*10000+date.getMinutes()*100+date.getSeconds();
+
+        item.Buys=[ { Vol: item.BidVol, Price: item.BidPrice } ];
+        item.Sells=[ { Vol: item.AskVol, Price: item.AskPrice } ];
+
+        //涨跌幅=（ 现价—上一交易日结算价）/上一交易日结算价×100%
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Increase=(item.Price-item.YFClose)/item.YFClose*100; //涨跌%
+            item.UpDown=item.Price-item.YFClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YFClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YFClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+    //商品期权
+    static JsonToStockItem_SHFEOption_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+        var shortSymbol=MARKET_SUFFIX_NAME.GetShortSymbol(symbol)
+
+        var item=
+        {
+            Symbol: symbol,
+            Name: shortSymbol,
+
+            BidVol:HQDataV2.StringToNumber(arySrcValue[0]),    //买 量 
+            BidPrice:HQDataV2.StringToNumber(arySrcValue[1]),   //竞买价，即“买一”报价
+            Close: HQDataV2.StringToNumber(arySrcValue[2]),
+            Price: HQDataV2.StringToNumber(arySrcValue[2]),
+
+            AskPrice:HQDataV2.StringToNumber(arySrcValue[3]),       //竞卖价，即“卖一”报价
+            AskVol:HQDataV2.StringToNumber(arySrcValue[4]),         //卖 量 
+            Position: HQDataV2.StringToNumber(arySrcValue[5]),      //持仓量
+            Increase:HQDataV2.StringToNumber(arySrcValue[6]),       //涨幅
+            ExePrice:HQDataV2.StringToNumber(arySrcValue[7]),        //行权价
+
+            YClose:HQDataV2.StringToNumber(arySrcValue[8]),        //昨收
+            Open: HQDataV2.StringToNumber(arySrcValue[9]),
+
+            UpLimit:HQDataV2.StringToNumber(arySrcValue[10]),       //涨停价
+            DownLimit:HQDataV2.StringToNumber(arySrcValue[11]),     //跌停价
+
+            High: HQDataV2.StringToNumber(arySrcValue[39]),         //最高
+            Low: HQDataV2.StringToNumber(arySrcValue[40]),          //最低
+            
+            Vol: HQDataV2.StringToNumber(arySrcValue[41]),       //成交量
+            Amount: HQDataV2.StringToNumber(arySrcValue[42]),    //成交金额
+            
+            YFClose: HQDataV2.StringToNumber(arySrcValue[44]),   //昨收
+        }
 
         var date=new Date(arySrcValue[32]);
         item.Date=date.getFullYear()*10000+(date.getMonth()+1)*100+date.getDate();
@@ -2540,6 +2637,126 @@ class HQDataV2
                     result.AryData.push({ Symbol:item.Symbol, Url:url, Code: 1});
                 }
             }
+            else if (MARKET_SUFFIX_NAME.IsSHFE(upperSymbol) || MARKET_SUFFIX_NAME.IsDCE(upperSymbol) || MARKET_SUFFIX_NAME.IsCZCE(upperSymbol))    //AL-2605
+            {
+                var shortSymbol=MARKET_SUFFIX_NAME.GetShortSymbol(upperSymbol);
+                var aryValue=shortSymbol.split("-");
+                var product=aryValue[0].toLowerCase();  //AL
+                var product2="_o"
+                var period=aryValue[1];     //2605
+
+
+                var market="shfe";
+                if (MARKET_SUFFIX_NAME.IsDCE(upperSymbol)) 
+                {
+                    market="dce";
+                }
+                else if (MARKET_SUFFIX_NAME.IsCZCE(upperSymbol)) 
+                {
+                    market="czce";
+                    product2="";
+                }
+
+                //https://stock.finance.sina.com.cn/futures/api/openapi.php/OptionService.getOptionData?type=futures&product=zn_o&exchange=shfe&pinzhong=zn2605
+                var url=`${HQDataV2.SINA.Option_List.SHFE.Url}?type=futures&product=${product}${product2}&exchange=${market}&pinzhong=${product}${period}`;
+                try
+                {
+                    const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                    const recv = await response.json();
+
+                    var data=HQDataV2.JsonToSHFEOptionList_SINA(recv, { Symbol:item.Symbol, Market: market } );
+                    if (data) 
+                    {
+                        data.Underlying={ Symbol:`${aryValue[0]}0.${market}` };
+                        result.AryData.push({ Symbol:item.Symbol, Url:url, Stock:data, Code:0 });
+                    }
+                    else result.AryData.push({ Symbol:item.Symbol, Url:url, Code: 1});
+                }
+                catch(error)
+                {
+                    result.AryData.push({ Symbol:item.Symbol, Url:url, Code: 1});
+                }
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToSHFEOptionList_SINA(recv,symboInfo)
+    {
+        if (!recv || !recv.result || !recv.result.data) return null;
+        var data=recv.result.data;
+
+        var mapData=new Map();
+        var result={ AryData:[], Symbol:symboInfo.Symbol };
+
+        if (IFrameSplitOperator.IsNonEmptyArray(data.down))
+        {
+            for(var i=0;i<data.down.length;++i)
+            {
+                var item=data.down[i];
+                var value=item[7];
+                if (!value) continue;
+               
+                //zn2605P26000
+                const regex = /^([a-zA-Z]+)(\d{4})([PC])(\d+)$/;
+                const match = regex.exec(value);
+                if (!match) continue;
+
+                // match[1]: 字母部分
+                // match[2]: 4位数字
+                // match[3]: P 或 C
+                // match[4]: 后面的数字  价格
+
+                var price=parseFloat(match[4]);
+                var shortSymbol=`${match[1].toUpperCase()}${match[2]}-${match[3]}-${match[4]}`;
+                var symbol=`${shortSymbol}.${symboInfo.Market}`;
+
+                if (mapData.has(price))
+                {
+                    var optionItem=mapData.get(price);
+                    optionItem.P={ Symbol:symbol, ShortSymbol:shortSymbol };
+                }
+                else
+                {
+                    var newItem={ Price:price };
+                    newItem.P={ Symbol:symbol, ShortSymbol:shortSymbol };
+                    mapData.set(newItem.Price, newItem);
+                }
+            }
+        }
+
+        if (IFrameSplitOperator.IsNonEmptyArray(data.up))
+        {
+            for(var i=0;i<data.up.length;++i)
+            {
+                var item=data.up[i];
+                var value=item[8];
+                const regex = /^([a-zA-Z]+)(\d{4})([PC])(\d+)$/;
+                const match = regex.exec(value);
+                if (!result) continue;
+
+                var price=parseFloat(match[4]);
+                var shortSymbol=`${match[1].toUpperCase()}${match[2]}-${match[3]}-${match[4]}`;
+                var symbol=`${shortSymbol}.${symboInfo.Market}`;
+
+                if (mapData.has(price))
+                {
+                    var optionItem=mapData.get(price);
+                    optionItem.C={ Symbol:symbol, ShortSymbol:shortSymbol };
+                }
+                else
+                {
+                    var newItem={ Price:price };
+                    newItem.C={ Symbol:symbol, ShortSymbol:shortSymbol };
+                    mapData.set(newItem.Price, newItem);
+                }
+            }
+        }
+
+        for(var [key, value] of mapData)
+        {
+            result.AryData.push(value);
         }
 
         return result;
@@ -2591,7 +2808,7 @@ class HQDataV2
             var item=realtimeData.AryData[i];
             if (item.Type=="P" || item.Type=="C")
             {
-                 if (mapData.has(item.ExePrice))
+                if (mapData.has(item.ExePrice))
                 {
                     var optionItem=mapData.get(item.ExePrice);
                     if (item.Type=="P")
@@ -2737,7 +2954,9 @@ class HQDataV2
 
         //成交明细
         //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
-        Detail:{ Url:"https://futsseapi.eastmoney.com/static/"}
+        Detail:{ Url:"https://futsseapi.eastmoney.com/static/" },
+        //期权 成交明细
+        Option_Detail:{ Url:"https://push2.eastmoney.com/api/qt/stock/details/get"}
     }
 
     //股本数据
@@ -2845,6 +3064,37 @@ class HQDataV2
         {
             marketID=1;
         }
+        else if (MARKET_SUFFIX_NAME.IsCFFEXOption(upperSymbol)) //中金所股票期权
+        {
+            marketID=221;
+        }
+        else if (MARKET_SUFFIX_NAME.IsSHFEOption(upperSymbol))  //上期所期权
+        {
+            marketID=151;
+            shortSymbol=shortSymbol.replaceAll("-","");
+        }
+        else if (MARKET_SUFFIX_NAME.IsDCEOption(upperSymbol))   //大连商品期权
+        {
+            marketID=140;
+            shortSymbol=shortSymbol.replaceAll("-","");
+        }
+        else if (MARKET_SUFFIX_NAME.IsCZCEOption(upperSymbol))  //郑州期货交易所 期权
+        {
+            marketID=141;
+            
+            //郑州商品交易所 去掉前面的年份 坑~~
+            var aryValue=shortSymbol.split("-");
+            shortSymbol=shortSymbol.replaceAll("-","");
+            var value=aryValue[0];
+            const reg = /^([a-zA-Z]+)(\d+)$/;
+            const matchResult = value.match(reg);
+            if (matchResult)
+            {
+                var name=matchResult[1];
+                var number=matchResult[2];
+                if (number.length==4) shortSymbol=`${name}${number.slice(1)}${aryValue[1]}${aryValue[2]}`;
+            }
+        }
         else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol))
         {
             marketID=220;
@@ -2855,7 +3105,7 @@ class HQDataV2
         }
         else if (MARKET_SUFFIX_NAME.IsCZCE(upperSymbol))
         {
-             //郑州商品交易所 去掉前面的年份 坑~~
+            //郑州商品交易所 去掉前面的年份 坑~~
             //核心正则：^开头 + 字母段 + 数字段 + $结尾
             const reg = /^([a-zA-Z]+)(\d+)$/;
             const matchResult = shortSymbol.match(reg);
@@ -2882,6 +3132,14 @@ class HQDataV2
         else if (MARKET_SUFFIX_NAME.IsINE(upperSymbol)) //上期能源
         {
             marketID=142;
+        }
+        else if (MARKET_SUFFIX_NAME.IsSHO(upperSymbol))
+        {
+            marketID=10;
+        }
+        else if (MARKET_SUFFIX_NAME.IsSZO(upperSymbol))
+        {
+            marketID=12;
         }
         
 
@@ -3254,6 +3512,79 @@ class HQDataV2
             else if (1 == type && 0 == diff) flag="空换";
             stockItem.Data.push({ Time:time, Time2:time2, Price:price, Vol:vol, ID:item.utime, PositionChange:diff, Type:type, Flag:flag })
         }
+
+        stockItem.Data.sort((left, right)=>{ return left.Time2-right.Time2; });
+        return stockItem;
+    }
+
+    //成交明细(期权)
+    static async RequestOptionDetail_EASTMONEY(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToEASTMONEYSymbol(symbol);
+            var count=50;
+            if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
+
+            //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
+            var url=`${HQDataV2.EASTMONEY.Option_Detail.Url}?fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55&fltt=2&pos=-${count}&secid=${fixedSymbol.MarketID}.${fixedSymbol.Symbol}&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=%7C0%7C0%7C0%7Cweb&_=${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json();
+
+                var stockItem=HQDataV2.JsonToOptionDetailData_EASTMONEY(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToOptionDetailData_EASTMONEY(recv, symbolInfo)
+    {
+        var stockItem={ Symbol:symbolInfo.Symbol, Date:null, Data:[] };
+        if (!recv || !recv.data || !IFrameSplitOperator.IsNonEmptyArray(recv.data.details)) return stockItem;
+
+        for(var i=0;i<recv.data.details.length;++i)
+        {
+            var strContent=recv.data.details[i];
+            var aryValue=strContent.split(",");
+
+            var time2=HQDataV2.StringToTimeNumber(aryValue[0]);
+            var time=parseInt(HQDataV2.StringToTimeNumber(aryValue[0])/100);
+           
+            var price=parseFloat(aryValue[1]);
+            var vol=parseFloat(aryValue[2])
+            var diff=parseFloat(aryValue[3]);  //仓差(持仓变化)
+            var type=parseInt(aryValue[4]); //1 = 开仓、2 = 平仓
+
+            //根据原始代码猜的
+            //o > 0 && Math.abs(o) == c ? "双开" : o < 0 && Math.abs(o) == c ? "双平" : 1 == i && o < 0 ? "多平" : 2 == i && o < 0 ? "空平" : 2 == i && o > 0 ? "多开" : 1 == i && o > 0 ? "空开" : 2 == i && 0 == o ? "多换" : 1 == i && 0 == o ? "空换" : ""), -1, l, -1)
+            var flag="";
+            if (diff > 0 && Math.abs(diff) == vol) flag="双开";
+            else if (diff < 0 && Math.abs(diff) == vol) flag="双平";
+            else if (1 == type && diff < 0) flag="多平";
+            else if (2 == type && diff < 0) flag= "空平";
+            else if (2 == type && diff > 0) flag="多开";
+            else if (1 == type && diff > 0) flag="空开";
+            else if (2 == type && 0 == diff) flag="多换";
+            else if (1 == type && 0 == diff) flag="空换";
+            stockItem.Data.push({ Time:time, Time2:time2, Price:price, Vol:vol, ID:time2, PositionChange:diff, Type:type, Flag:flag })
+        }
+
+        if (IFrameSplitOperator.IsNumber(recv.data.prePrice)) stockItem.YFClose=recv.data.prePrice;
 
         stockItem.Data.sort((left, right)=>{ return left.Time2-right.Time2; });
         return stockItem;

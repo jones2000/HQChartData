@@ -40,6 +40,7 @@ var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
 item.ArySymbol=
 [ 
+    { Symbol:"ZN2603-C-26500.shfe" },
     { Symbol:"10010448.sho" },
     { Symbol:"920000.bj"}, { Symbol:"AU2602.shfe"}, 
     { Symbol:"002594.sz"}, { Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  
@@ -73,8 +74,13 @@ item.ArySymbol=[{ Symbol:"600000.sh" }];
 /*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.DETAIL_DATA_ID;
-item.ArySymbol=[{ Symbol:"920000.bj" }];
+item.ArySymbol=
+[
+    { Symbol:"10010723.sho"},
+    { Symbol:"920000.bj" }
+];
 */
+
 
 
 
@@ -83,6 +89,8 @@ var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.BASE_DATA_ID;
 item.ArySymbol=
 [
+    { Symbol:"SA2601-C-1000.czc"},
+    { Symbol:"M2605-P-2400.shfe"},
     { Symbol:"IO2601-C-4000.cffex"},
     { Symbol:"920000.bj"},
     { Symbol:"BC2601.ine"},{Symbol:"SI2601.gzfe"}, {Symbol:"IF2603.cfe"}, {Symbol:"BB2601.dce"}, { Symbol:"AU0.shfe"}, 
@@ -90,6 +98,8 @@ item.ArySymbol=
     { Symbol:"300750.sz"} 
 ];
 */
+
+
 
 
 
@@ -104,11 +114,16 @@ var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.OPTION_LIST_ID;
 item.ArySymbol=
 [
-    //{ Symbol:"mo2601.cffex", Product:"mo", Period:"2601" }
+    { Symbol:"SR-2605.czc"},
+    { Symbol:"M-2605.dce" },
+    { Symbol:"ZN-2605.shfe" },
+    { Symbol:"mo2601.cffex" },
     { Symbol:"159922-2602.szo"},
     { Symbol:"510050-2601.sho"}
 ];
 */
+
+
 
 
 g_HQChartDataService.RequestData(item);
