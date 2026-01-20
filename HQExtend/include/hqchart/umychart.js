@@ -102904,7 +102904,9 @@ var MARKET_SUFFIX_NAME=
     CFFEX3:'.CF',        //中期所 (China Financial Futures Exchange)
     DCE: '.DCE',         //大连商品交易所(Dalian Commodity Exchange)
     CZCE: '.CZC',        //郑州期货交易所
-    GZFE:".GZFE",        //广州期货交易所
+    CZCE2:".CZCE",        //郑州期货交易所
+    GZFE:".GZFE",         //广州期货交易所
+    GZFE2:"GFEX",         //广州期货交易所
     INE:".INE",          //上海国际能源交易中心
 
     USA:'.USA',          //美股
@@ -103199,7 +103201,8 @@ var MARKET_SUFFIX_NAME=
     IsCZCE: function (upperSymbol) 
     {
         if (!upperSymbol) return false;
-        return upperSymbol.indexOf(this.CZCE) > 0;
+
+        return upperSymbol.indexOf(this.CZCE) > 0 || upperSymbol.indexOf(this.CZCE2)>0;
     },
 
     IsCZCEOption:function(upperSymbol)
@@ -103224,13 +103227,55 @@ var MARKET_SUFFIX_NAME=
     IsGZFE:function(upperSymbol)
     {
         if (!upperSymbol) return false;
-        return upperSymbol.indexOf(this.GZFE) > 0;
+        if (upperSymbol.indexOf(this.GZFE)>0) return true;
+        if (upperSymbol.indexOf(this.GZFE2)>0) return true;
+        
+        return false;
+    },
+
+    IsGZFEOption:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (!this.IsGZFE(upperSymbol)) return false;
+        var shortSymbol=JSChart.GetShortSymbol(upperSymbol); 
+        //ZN2605-P-20600
+        var aryValue=shortSymbol.split("-");
+        if (!aryValue || aryValue.length!=3) return false;
+
+        var strValue=aryValue[0];
+        const regex = /([a-zA-Z]+)(\d+)/;
+        const match = strValue.match(regex);
+        if (!match || !match[1] || !match[2]) return false;
+
+        var prefix=match[1];
+
+        return true;
     },
 
     IsINE:function(upperSymbol)
     {
         if (!upperSymbol) return false;
         return upperSymbol.indexOf(this.INE) > 0;
+    },
+
+
+    IsINEOption:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (!this.IsINE(upperSymbol)) return false;
+        var shortSymbol=JSChart.GetShortSymbol(upperSymbol); 
+        //ZN2605-P-20600
+        var aryValue=shortSymbol.split("-");
+        if (!aryValue || aryValue.length!=3) return false;
+
+        var strValue=aryValue[0];
+        const regex = /([a-zA-Z]+)(\d+)/;
+        const match = strValue.match(regex);
+        if (!match || !match[1] || !match[2]) return false;
+
+        var prefix=match[1];
+
+        return true;
     },
 
     //是否包含某一个市场的

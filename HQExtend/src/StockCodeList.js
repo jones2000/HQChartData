@@ -62,8 +62,22 @@ class StockCodeList
     };
     
 
-    MapStock=new Map(); //key=symbol  vallue:{ Symbol, ShortSymbol, Name, Type:1=股票 2=指数 3=期货  }
+    MapStock=new Map(); //key=symbol  vallue:{ Symbol, ShortSymbol, Name, Type:1=股票 2=指数 3=期货 4=期权 5=基金  }
     SaveKey="CodeList_110C5580-6415-4B01-87B6-E6D871925773";
+
+    GetStockItem(symbol)
+    {
+        if (!this.MapStock.has(symbol)) return null;
+
+        return this.MapStock.get(symbol);
+    }
+
+    static OPENCTP=
+    {
+        //http://openctp.cn/instruments.html
+        //http://dict.openctp.cn/instruments?types=option&markets=SHFE,CFFEX
+        Futrues:{ Url:"http://dict.openctp.cn/instruments" }
+    }
 
     static GetInstance()
     {
@@ -120,13 +134,32 @@ class StockCodeList
     {
         await this.LoadLocalCache();
 
-        //return;
+        this.DownloadFutruesOption_OPENCTP().then((res)=>
+        {
+            console.log(`[StockCodeList::DownloadFutruesOption_OPENCTP] Count=${res.Count}`);
+        });
+
+        this.DownloadFutrues_OPENCTP().then((res)=>
+        {
+            console.log(`[StockCodeList::DownloadFutrues_OPENCTP] Count=${res.Count}`);
+        });
+
+        this.DownloadFund_OPENCTP().then((res)=>
+        {
+            console.log(`[StockCodeList::DownloadFund_OPENCTP] Count=${res.Count}`);
+        })
+
+        this.DownloadSHSZStock_OPENCTP().then((res)=>
+        {
+            console.log(`[StockCodeList::DownloadSHSZStock_OPENCTP] Count=${res.Count}`);
+        })
 
         this.DownloadBJStock().then((res)=>
         {
             console.log(`[StockCodeList::DownloadBJStock] Count=${res.Count}`);
         });
 
+        /*
         this.DownloadFutures_CZCE().then((res)=>
         {
             console.log(`[StockCodeList::DownloadFutures_CZCE] Count=${res.Count}`);
@@ -146,6 +179,7 @@ class StockCodeList
         {
             console.log(`[StockCodeList::DownloadFutures_CFFEX] Count=${res.Count}`);
         });
+        */
 
         this.DownloadSHSZIndex().then((res)=>
         {
@@ -170,12 +204,32 @@ class StockCodeList
         this.Save();
     }
 
-    GetStockList()
+    GetStockList(reqData)
     {
+        var aryMarket=reqData.Request.AryMarket;
+        var setType=new Set();
+        if (IFrameSplitOperator.IsNonEmptyArray(aryMarket))
+        {
+            for(var i=0;i<aryMarket.length;++i)
+            {
+                var item=aryMarket[i];
+                if (IFrameSplitOperator.IsNumber(item.Type))
+                {
+                    if (!setType.has(item.Type))  setType.add(item.Type);
+                }
+            }
+        }
+
         var aryData=[];
         for(var mapItem of this.MapStock)
         {
             var item=mapItem[1];
+
+            if (setType.size>0)
+            {
+                if (!setType.has(item.Type)) continue;
+            }
+
             aryData.push(item);
         }
 
@@ -979,6 +1033,407 @@ class StockCodeList
     }
 
 
+    //期货期权
+    async DownloadFutruesOption_OPENCTP()
+    {
+        var result={ Count:0 };
+
+        const MARKET_LIST=["SSE","SZSE", "CZCE","DCE","GFEX","INE","SHFE", "CFFEX" ];
+        
+        for(var i=0;i<MARKET_LIST.length;++i)
+        {
+            var market=MARKET_LIST[i];
+
+            try
+            {
+                //http://dict.openctp.cn/instruments?types=option&markets=SHFE,CFFEX
+                var url=`${StockCodeList.OPENCTP.Futrues.Url}?types=option&markets=${market}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv=await response.json();
+
+                var aryData=StockCodeList.JsonToFuturesOption_OPENCTP(recv);
+                if (!aryData) continue;
+
+                if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+                {
+                    for(var j=0;j<aryData.length;++j)
+                    {
+                        var item=aryData[j];
+                        this.MapStock.set(item.Symbol, item);
+                        ++result.Count;
+                    }
+                }
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::DownloadFutruesOption_OPENCTP] error", error);
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToFuturesOption_OPENCTP(recv)
+    {
+        if (!recv) return null;
+        if (!IFrameSplitOperator.IsNonEmptyArray(recv.data)) return null;
+
+        var aryData=[]
+        for(var i=0;i<recv.data.length;++i)
+        {
+            var item=recv.data[i];
+            var market=item.ExchangeID;
+            var extPrice=item.StrikePrice;
+            var value=item.InstrumentID; //ad2602C19100
+            
+            //标的
+            var underlying={ Symbol:`${item.UnderlyingInstrID.toUpperCase()}.${market.toLowerCase()}` };
+            var expireDate=HQDataV2.StringToDateNumber(item.ExpireDate);
+            var openDate=HQDataV2.StringToDateNumber(item.OpenDate);
+            var deliveryDate=HQDataV2.StringToDateNumber(item.DeliveryDate);
+
+            if (market=="CFFEX" || market=="DCE" || market=="GFEX")
+            {
+                var shortSymbol=value;
+                var symbol=`${shortSymbol.toUpperCase()}.${market.toLowerCase()}`;
+                var product=item.ProductID;
+                var aryValue=value.split("-");
+                if (aryValue.length<3) continue;
+
+                //HO2602
+                var regex=/([a-zA-Z]+)(\d+)/;
+                var match=value.match(regex);
+                if (!match) continue;
+                var period=match[2];
+                var type=aryValue[1];
+                product=match[1].toUpperCase();
+                var name=shortSymbol;
+
+                if (market=="CFFEX")    //股指期权 手动改下标的
+                {
+                    //IO 000300.sh
+                    //MO 000852.sh
+                    //HO 000016.sh
+                    if (product=="IO") underlying.Symbol="000300.sh";
+                    else if (product=="MO") underlying.Symbol="000852.sh";
+                    else if (product=="HO") underlying.Symbol="000016.sh";
+                }
+            }
+            else if (market=="CZCE")
+            {
+                const regex = /^([a-zA-Z]+)(\d{3})([PC])(\d+)$/;
+                const match = regex.exec(value);
+                if (!match) continue;
+
+                // match[1]: 字母部分
+                // match[2]: 3位数字
+                // match[3]: P 或 C
+                // match[4]: 后面的数字  价格
+
+                var period=2000+parseInt(match[2])
+                var product=match[1].toUpperCase();
+                var shortSymbol=`${product}${period}-${match[3]}-${match[4]}`;
+                var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+                var type=match[3];
+                var name=shortSymbol;
+
+                var info=MARKET_SUFFIX_NAME.SplitSymbol(item.UnderlyingInstrID.toUpperCase(),"A+D+");
+
+                underlying={ Symbol:`${info.AryString[0]}2${info.AryString[1]}.${market.toLowerCase()}` };
+
+            }
+            else if (market=="SSE") //上交所
+            {
+                market="SH";
+                var name=item.InstrumentName.trim();
+                var shortSymbol=value;
+                var symbol=`${value}.sho`;
+                var period=`${(item.DeliveryYear%100)*100+item.DeliveryMonth}`;
+                var product=`ETF`;
+                var type="P";
+                if (name.indexOf("购")>0) type="C";
+                if (name[name.length-1]=="A") period=`${period}A`;
+
+                underlying={ Symbol:`${item.UnderlyingInstrID.toUpperCase()}.${market.toLowerCase()}` };
+            }
+            else if (market=="SZSE")    //深交所
+            {
+                market="SZ";
+                var name=item.InstrumentName.trim();
+                var shortSymbol=value;
+                var symbol=`${value}.szo`;
+                var period=`${(item.DeliveryYear%100)*100+item.DeliveryMonth}`;
+                var type="P";
+                var product=`ETF`;
+                if (name.indexOf("购")>0) type="C";
+                if (name[name.length-1]=="A") period=`${period}A`;
+
+                underlying={ Symbol:`${item.UnderlyingInstrID.toUpperCase()}.${market.toLowerCase()}` };
+            }
+            else
+            {
+                const regex = /^([a-zA-Z]+)(\d{4})([PC])(\d+)$/;
+                const match = regex.exec(value);
+                if (!match) continue;
+
+                // match[1]: 字母部分
+                // match[2]: 4位数字
+                // match[3]: P 或 C
+                // match[4]: 后面的数字  价格
+
+                var product=match[1].toUpperCase();
+                var shortSymbol=`${product}${match[2]}-${match[3]}-${match[4]}`;
+                var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+                var period=match[2];
+                var type=match[3];
+                var name=shortSymbol;
+            }
+
+            
+
+            aryData.push(
+            { 
+                Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:4, Market:market, ExePrice:extPrice,
+                AryProperty:
+                [ 
+                    { Name:"期权信息", Option:{ Type:type, Product:product, Period:period, OpenDate:openDate, ExpireDate:expireDate, DeliveryDate:deliveryDate } }, 
+                    { Name:"标的信息", Underlying:underlying }  
+                ] 
+            });
+        }
+
+        return aryData;
+    }
+
+
+    //期货
+    async DownloadFutrues_OPENCTP()
+    {
+        var result={ Count:0 };
+
+        const MARKET_LIST=["CZCE","DCE","GFEX","INE","SHFE", "CFFEX" ];
+        
+        for(var i=0;i<MARKET_LIST.length;++i)
+        {
+            var market=MARKET_LIST[i];
+
+            try
+            {
+                //http://dict.openctp.cn/instruments?types=option&markets=SHFE,CFFEX
+                var url=`${StockCodeList.OPENCTP.Futrues.Url}?types=futures&markets=${market}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv=await response.json();
+
+                var aryData=StockCodeList.JsonToFutures_OPENCTP(recv);
+                if (!aryData) continue;
+
+                if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+                {
+                    for(var j=0;j<aryData.length;++j)
+                    {
+                        var item=aryData[j];
+                        this.MapStock.set(item.Symbol, item);
+                        ++result.Count;
+                    }
+                }
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::DownloadFutruesOption_OPENCTP] error", error);
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToFutures_OPENCTP(recv)
+    {
+        if (!recv) return null;
+        if (!IFrameSplitOperator.IsNonEmptyArray(recv.data)) return null;
+
+        var aryData=[]
+        for(var i=0;i<recv.data.length;++i)
+        {
+            var item=recv.data[i];
+            var market=item.ExchangeID;
+            var value=item.InstrumentID;    
+            var name=item.InstrumentName;
+            var product=item.ProductID;
+            var expireDate=HQDataV2.StringToDateNumber(item.ExpireDate);
+            var openDate=HQDataV2.StringToDateNumber(item.OpenDate);
+            var deliveryDate=HQDataV2.StringToDateNumber(item.DeliveryDate);
+            var shortSymbol=value.toUpperCase();
+
+            if (market=="CZCE")
+            {
+                var info=MARKET_SUFFIX_NAME.SplitSymbol(value,"A+D+");
+                if (info.AryString[1].length==3)      //3位数字转4位
+                {
+                    var shortSymbol=`${info.AryString[0]}2${info.AryString[1]}`;
+                }
+
+            }
+            
+            var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+
+            aryData.push(
+            { 
+                Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:3, Market:market,
+                AryProperty:
+                [ 
+                    { Name:"期货信息", Futures:{ Product:product, OpenDate:openDate, ExpireDate:expireDate, DeliveryDate:deliveryDate } }, 
+                ] 
+            });
+        }
+
+        return aryData;
+    }
+
+    //基金
+    async DownloadFund_OPENCTP()
+    {
+        var result={ Count:0 };
+
+        const MARKET_LIST=["SSE","SZSE"];
+        
+        for(var i=0;i<MARKET_LIST.length;++i)
+        {
+            var market=MARKET_LIST[i];
+
+            try
+            {
+                //http://dict.openctp.cn/instruments?types=option&markets=SHFE,CFFEX
+                var url=`${StockCodeList.OPENCTP.Futrues.Url}?types=fund&markets=${market}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv=await response.json();
+
+                var aryData=StockCodeList.JsonToFund_OPENCTP(recv);
+                if (!aryData) continue;
+
+                if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+                {
+                    for(var j=0;j<aryData.length;++j)
+                    {
+                        var item=aryData[j];
+                        this.MapStock.set(item.Symbol, item);
+                        ++result.Count;
+                    }
+                }
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::JsonToFund_OPENCTP] error", error);
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToFund_OPENCTP(recv)
+    {
+        if (!recv) return null;
+        if (!IFrameSplitOperator.IsNonEmptyArray(recv.data)) return null;
+
+        var aryData=[]
+        for(var i=0;i<recv.data.length;++i)
+        {
+            var item=recv.data[i];
+            var market=item.ExchangeID;
+            var value=item.InstrumentID;
+            var name=item.InstrumentName.trim();
+            var product=item.ProductID;
+
+            if (market=="SSE") market="SH";
+            else if (market=="SZSE") market="SZ";
+
+            var shortSymbol=value;
+            var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+
+            aryData.push(
+            { 
+                Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:5, Market:market,
+                AryProperty:
+                [ 
+                    { Name:"基金信息", Futures:{ Type:product } }, 
+                ] 
+            });
+        }
+
+        return aryData;
+    }
+
+    async DownloadSHSZStock_OPENCTP()
+    {
+        var result={ Count:0 };
+
+        const MARKET_LIST=["SSE","SZSE"];
+        
+        for(var i=0;i<MARKET_LIST.length;++i)
+        {
+            var market=MARKET_LIST[i];
+
+            try
+            {
+                //http://dict.openctp.cn/instruments?types=option&markets=SHFE,CFFEX
+                var url=`${StockCodeList.OPENCTP.Futrues.Url}?types=stock&markets=${market}`;
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv=await response.json();
+
+                var aryData=StockCodeList.JsonToSHSZStock_OPENCTP(recv);
+                if (!aryData) continue;
+
+                if (IFrameSplitOperator.IsNonEmptyArray(aryData))
+                {
+                    for(var j=0;j<aryData.length;++j)
+                    {
+                        var item=aryData[j];
+                        this.MapStock.set(item.Symbol, item);
+                        ++result.Count;
+                    }
+                }
+            }
+            catch(error)
+            {
+                console.warn("[StockCodeList::DownloadSHSZStock_OPENCTP] error", error);
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToSHSZStock_OPENCTP(recv)
+    {
+        if (!recv) return null;
+        if (!IFrameSplitOperator.IsNonEmptyArray(recv.data)) return null;
+
+        var aryData=[]
+        for(var i=0;i<recv.data.length;++i)
+        {
+            var item=recv.data[i];
+            var market=item.ExchangeID;
+            var value=item.InstrumentID;
+            var name=item.InstrumentName.trim();
+            var product=item.ProductID;
+            var openDate=HQDataV2.StringToDateNumber(item.OpenDate);
+
+            if (market=="SSE") market="SH";
+            else if (market=="SZSE") market="SZ";
+
+            var shortSymbol=value;
+            var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+
+            aryData.push(
+            { 
+                Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:1, Market:market,
+                AryProperty:
+                [ 
+                    { Name:"股票信息", Stock:{ OpenDate:openDate } }, 
+                ] 
+            });
+        }
+
+        return aryData;
+    }
 }
 
 var g_StockCodeList=new StockCodeList();

@@ -2,7 +2,7 @@
 {
     "manifest_version": 3,
     "name": "HQChart行情数据插件",
-    "version": "1.0.57",
+    "version": "1.0.65",
     "background":
     {
         "service_worker": "src/HQDataWorker.js"
@@ -53,7 +53,10 @@
         "http://www.cffex.com.cn/*",
         "https://www.shfe.com.cn/*",
         "https://quotation.czce.com.cn/*",
-        "https://www.czce.com.cn/*"
+        "https://www.czce.com.cn/*",
+
+
+        "http://dict.openctp.cn/*"
     ],
 
 
