@@ -27815,6 +27815,7 @@ function ChartKLine()
                         // 17=订单流样式4
                         // 18=订单流样式5
                         // 19=HLC bars
+                        // 20=空心K线柱子3(阴实心 阳空心)
 
     this.CloseLineColor=g_JSChartResource.CloseLineColor;
     this.CloseLineAreaColor=g_JSChartResource.CloseLineAreaColor;
@@ -29017,7 +29018,9 @@ function ChartKLine()
 
     this.DrawKBar_Up=function(data, dataWidth, upColor, drawType, x, y, left, right, yLow, yHigh, yOpen, yClose, isHScreen) //阳线
     {
-        var isEmptyBar=(drawType==3 || drawType==6);
+        var isEmptyBar=false;
+        if (drawType==3 || drawType==6) isEmptyBar=true;
+
         if (dataWidth>=4)
         {
             if (isEmptyBar)
@@ -29145,7 +29148,9 @@ function ChartKLine()
 
     this.DrawKBar_Down=function(data, dataWidth, downColor, drawType, x, y, left, right, yLow, yHigh, yOpen, yClose, isHScreen) //阴线
     {
-        var isEmptyBar=(drawType==6);
+        var isEmptyBar=false;
+        if (drawType==6 || drawType==20) isEmptyBar=true;
+
         if (dataWidth>=4)
         {
             if (isEmptyBar)
@@ -58734,6 +58739,7 @@ function FrameSplitMinuteX()
 
         const minuteCoordinate = g_MinuteCoordinateData;
         var xcoordinateData = minuteCoordinate.GetCoordinateData(this.Symbol, width, this.Frame.GlobalOption);
+        if (!xcoordinateData) return;
         var minuteCount=xcoordinateData.Count;
         var minuteMiddleCount=xcoordinateData.MiddleCount>0? xcoordinateData.MiddleCount: parseInt(minuteCount/2);
         var xcoordinate = xcoordinateData.Data;
@@ -89539,13 +89545,16 @@ function KLineChartContainer(uielement,OffscreenElement, cacheElement)
                 Name:"主图线型", 
                 SubMenu:
                 [
+                    { Name:"K线(实心)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[0]}, Checked:klineType==0 },
                     { Name:"K线(空心阳线)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[3]}, Checked:klineType==3 },
-                    { Name:"K线(实心阳线)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[0]}, Checked:klineType==0 },
+                    { Name:"K线(空心阴线)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[20]}, Checked:klineType==20 },
+                    { Name:"K线(空心)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[6]}, Checked:klineType==6 },
+
                     { Name:"美国线", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[2, true, { IsThinAKBar:false }]}, Checked:(klineType==2&&!bThinAKBar) },
                     { Name:"美国线(细)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[2, true, { IsThinAKBar:true }]}, Checked:(klineType==2&&bThinAKBar) },
                     { Name:"收盘线", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[1]}, Checked:klineType==1},
                     { Name:"收盘面积", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[4]}, Checked:klineType==4 },
-                    { Name:"K线(空心阳线阴线)", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[6]}, Checked:klineType==6 },
+                    
                     { Name:"Heikin Ashi", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[11]}, Checked:klineType==11 },
                     { Name:"Line Break", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[12]}, Checked:klineType==12 },
                     { Name:"High-low", Data:{ ID: JSCHART_MENU_ID.CMD_CHANGE_KLINE_TYPE_ID, Args:[13]}, Checked:klineType==13 },
@@ -102910,6 +102919,12 @@ var MARKET_SUFFIX_NAME=
     INE:".INE",          //上海国际能源交易中心
 
     USA:'.USA',          //美股
+    USA_INDEX:".USAI",  //美股指数
+    USA_NSDAQ:".NSDAQ",  //美国纳斯达克证券交易所
+    USA_NYSE:".NYSE",    //美国纽约证券交易所
+    USA_ANPDY:".ANPDY",  //美国粉单市场
+    USA_AMEX:".AMEX",    //美国证券交易所
+
     FTSE:'.FTSE',        //富时中国
 
     BIT:'.BIT',          //数字货币 如比特币
@@ -103036,7 +103051,49 @@ var MARKET_SUFFIX_NAME=
     IsUSA:function(upperSymbol) //是否是美股
     {
         if (!upperSymbol) return false;
-        return upperSymbol.indexOf(this.USA) > 0;
+        if (upperSymbol.indexOf(this.USA) > 0) return true;
+        if (upperSymbol.indexOf(this.USA_NSDAQ) > 0) return true;
+        if (upperSymbol.indexOf(this.USA_NYSE) > 0) return true;
+        if (upperSymbol.indexOf(this.USA_ANPDY) > 0) return true;
+        if (upperSymbol.indexOf(this.USA_AMEX) > 0) return true;
+        if (upperSymbol.indexOf(this.USA_INDEX) > 0) return true;
+
+        return false;
+    },
+
+    IsUSAIndex:function(upperSymbol)    //美股指数
+    {
+        if (!upperSymbol) return false;
+        if (upperSymbol.indexOf(this.USA_INDEX) > 0) return true;
+        return false;
+    },
+
+    IsUSA_NSDAQ:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (upperSymbol.indexOf(this.USA_NSDAQ) > 0) return true;
+        return false;
+    },
+
+    IsUSA_NYSE:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (upperSymbol.indexOf(this.USA_NYSE) > 0) return true;
+        return false;
+    },
+
+    IsUSA_AMEX:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (upperSymbol.indexOf(this.USA_AMEX) > 0) return true;
+        return false;
+    },
+
+    IsUSA_ANPDY:function(upperSymbol)
+    {
+        if (!upperSymbol) return false;
+        if (upperSymbol.indexOf(this.USA_ANPDY) > 0) return true;
+        return false;
     },
 
     IsSH: function (upperSymbol)
@@ -103909,9 +103966,8 @@ var MARKET_SUFFIX_NAME=
             var match=shortSymbol.match(regex);
             if (!match || !match[1] || !match[2]) return null;
             
-            return { AryString:[match[1], match[2]], ShortSymbol:shortSymbol, Symbol:symbol, Market:symbol.slice(shortSymbol.length) };
+            return { AryString:[match[1], match[2]], ShortSymbol:shortSymbol, Symbol:symbol, Market:symbol.slice(shortSymbol.length+1) };
         }
-
 
         return null;
     }

@@ -60,6 +60,13 @@ class StockCodeList
         Url:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getANHData?page=1&num=100&sort=hrap&asc=0&node=hgt_ah&_s_r_a=init",
         Url2:"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getANHData?page=1&num=100&sort=hrap&asc=0&node=sgt_ah&_s_r_a=init"
     };
+
+    //美股
+    static USA_STOCK=
+    {  
+        //中概股
+        QQ:{ Url:"https://proxy.finance.qq.com/cgi/cgi-bin/rank/us/getList" } 
+    };
     
 
     MapStock=new Map(); //key=symbol  vallue:{ Symbol, ShortSymbol, Name, Type:1=股票 2=指数 3=期货 4=期权 5=基金  }
@@ -133,6 +140,11 @@ class StockCodeList
     async Download()
     {
         await this.LoadLocalCache();
+
+        this.DonloadUSAStock_QQ().then((res)=>
+        {
+            console.log(`[StockCodeList::DonloadUSAStock_QQ] Count=${res.Count}`);
+        })
 
         this.DownloadFutruesOption_OPENCTP().then((res)=>
         {
@@ -1433,6 +1445,92 @@ class StockCodeList
         }
 
         return aryData;
+    }
+
+    async DonloadUSAStock_QQ()
+    {
+        var result={ Count:0 };
+
+        const STOCK_TYPE=[ {Type:"cdr", Name:"中概股"}, {Type:"tec", Name:"科技股"} ];
+
+        for(var i=0, j=0;i<STOCK_TYPE.length;++i)
+        {
+            var item=STOCK_TYPE[i];
+
+            var totalCount=300;
+            var pageSize=100;
+            for(j=0;j<totalCount;j+=pageSize)
+            {
+                try
+                {
+                    //https://proxy.finance.qq.com/cgi/cgi-bin/rank/us/getList?board_type=cdr&sort_type=price&direct=down&offset=0&count=20
+                    var url=`${StockCodeList.USA_STOCK.QQ.Url}?board_type=${item.Type}&sort_type=price&direct=down&offset=0&${j}=${pageSize}`;
+                    const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                    const recv=await response.json();
+
+                    var data=StockCodeList.JsonToUSAStock_QQ(recv, item);
+                    if (!data) continue;
+
+                    if (IFrameSplitOperator.IsNonEmptyArray(data.AryData))
+                    {
+                        for(var k=0;k<data.AryData.length;++k)
+                        {
+                            var item=data.AryData[k];
+                            this.MapStock.set(item.Symbol, item);
+                            ++result.Count;
+                        }
+                    }
+
+                    if (IFrameSplitOperator.IsNumber(data.Count)) totalCount=data.Count;
+                }
+                catch(error)
+                {
+                    console.warn("[StockCodeList::DonloadUSAStock_QQ] error", error);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToUSAStock_QQ(recv, option)
+    {
+        if (!recv || !recv.data || !IFrameSplitOperator.IsNonEmptyArray(recv.data.rank_list)) return null;
+
+        var aryData=[];
+        for(var i=0;i<recv.data.rank_list.length;++i)
+        {
+            var item=recv.data.rank_list[i];
+            var name=item.name;
+            var value=item.code;
+            const regex = /(us)([a-zA-Z]+)\.([a-zA-Z]+)/;
+            const matches = value.match(regex);
+            if (!matches) continue;
+
+            var shortSymbol=matches[2];
+            
+            var market="usa";
+            if (matches[3]=="OQ") market="NSDAQ";           //美国纳斯达克证券交易所
+            else if (matches[3]=="N") market="NYSE";        //美国纽约证券交易所
+            else if (matches[3]=="PS") market="ANPDY";      //美国粉单市场
+            else if (matches[3]=="AM") market="AMEX";       //美国证券交易所
+
+            var symbol=`${shortSymbol}.${market.toLowerCase()}`;
+
+            aryData.push(
+            { 
+                Symbol:symbol, Name:name, ShortSymbol:shortSymbol, Type:1, Market:"USA",
+                AryProperty:
+                [ 
+                    { Name:"股票信息", Stock:{ Exchange:market } },
+                    { Name:option.Name }, 
+                ] 
+            });
+        }
+
+        var count=null;
+        if (IFrameSplitOperator.IsNumber(recv.data.total)) count=recv.data.total;
+        return { AryData:aryData, Count:count };
     }
 }
 

@@ -562,6 +562,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestMinute_Stock_SINA({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+            {
+                recvData= await HQDataV2.RequestMinuteV2_QQ({Request:{ ArySymbol:[item]}});
+            }
             
             
             if (recvData)
@@ -609,6 +613,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestKLine_Day_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
 
             if (recvData)
             {
@@ -649,6 +657,10 @@ class HQDataV2
             {
                 recvData=await HQDataV2.RequestKLine_Minute_Futrues_SINA({Request:{ ArySymbol:[item]}});
             }
+            else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestKLine_Minute_USAStock_SINA({Request:{ ArySymbol:[item]}});
+            }
 
             if (recvData)
             {
@@ -673,7 +685,7 @@ class HQDataV2
             {
                 aryQQ.push(item);
             }
-            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
+            else if (MARKET_SUFFIX_NAME.IsHK(upperSymbol) || MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol) || MARKET_SUFFIX_NAME.IsBJ(upperSymbol) || MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
             {
                 arySINA.push(item);
             }
@@ -735,6 +747,10 @@ class HQDataV2
             else if (MARKET_SUFFIX_NAME.IsChinaFutures(upperSymbol))
             {
                 recvData=await HQDataV2.RequestDetail_EASTMONEY({Request:{ ArySymbol:[item]}});
+            }
+            else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+            {
+                recvData=await HQDataV2.RequestUSAStockDetail_EASTMONEY({Request:{ ArySymbol:[item]}});
             }
 
             if (recvData)
@@ -821,6 +837,14 @@ class HQDataV2
         {
             fixedSymbol=`hk${JSChart.GetShortSymbol(symbol)}`;
         }
+        else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+        {
+            fixedSymbol=`us${JSChart.GetShortSymbol(symbol)}`;
+            if (MARKET_SUFFIX_NAME.IsUSA_NSDAQ(upperSymbol)) fixedSymbol+=".OQ";
+            else if (MARKET_SUFFIX_NAME.IsUSA_NYSE(upperSymbol)) fixedSymbol+=".N";
+            else if (MARKET_SUFFIX_NAME.IsUSA_AMEX(upperSymbol)) fixedSymbol+=".AM";
+            else if (MARKET_SUFFIX_NAME.IsUSA_ANPDY(upperSymbol)) fixedSymbol+=".PS";
+        }
 
         return fixedSymbol;
     }
@@ -871,6 +895,8 @@ class HQDataV2
             var url=`${HQDataV2.QQ.Minute.Url}minute/query?code=${fixedSymbol}`;
             if (MARKET_SUFFIX_NAME.IsHK(upperSymbol))
                 url=`${HQDataV2.QQ.Minute.Url}hkMinute/query?code=${fixedSymbol}`;
+            else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+                url=`${HQDataV2.QQ.Minute.Url}UsMinute/query?code=${fixedSymbol}&r=${new Date().getTime()}`;
 
             try
             {
@@ -957,6 +983,7 @@ class HQDataV2
         {
             var item=arySymbol[i];
             var symbol=item.Symbol;
+            var upperSymbol=symbol.toUpperCase();
             var period=0, count=640, right=0;
             var startDate="", endDate="";   //1999-01-01
             if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
@@ -969,10 +996,21 @@ class HQDataV2
 
             try
             {
-                //var url="https://web.ifzq.gtimg.cn/appstock/app/kline/kline?_var=kline_week&param=usMSFT.OQ,week,,,320";
-                var url=`${HQDataV2.QQ.KLine.Url}newkline/newkline?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count}`;
-                if (right===1 || right===2) //复权
-                    url=`${HQDataV2.QQ.KLine.Url}newfqkline/get?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count},${fixedRight}`;
+                if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+                {
+                    //https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=us.DJI,day,,,320,qfq&r=0.4040884998278362
+                    //https://web.ifzq.gtimg.cn/appstock/app/kline/kline?_var=kline_week&param=usMSFT.OQ,week,,,320;
+                    var url=`${HQDataV2.QQ.KLine.Url}kline/kline?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count}`;
+                    if (right==1) //复权
+                        url=`${HQDataV2.QQ.KLine.Url}usfqkline/get?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count}`;
+                }
+                else
+                {
+                    var url=`${HQDataV2.QQ.KLine.Url}newkline/newkline?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count}`;
+                    if (right===1 || right===2) //复权
+                        url=`${HQDataV2.QQ.KLine.Url}newfqkline/get?param=${fixedSymbol},${fixedPeriod},${startDate},${endDate},${count},${fixedRight}`;
+                }
+                
 
                 const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
                 const recv = await response.json();
@@ -1503,6 +1541,10 @@ class HQDataV2
         //期货分钟K线
         KLineMinute_Futrues:{ Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20minkline=/InnerFuturesNewService.getFewMinLine"},
 
+        //https://stock.finance.sina.com.cn/usstock/api/jsonp_v2.php/var%20_AACAY_5_1769189853353=/US_MinKService.getMinK?symbol=AACAY&type=5&___qn=3
+        //美股
+        KLineMinute_USAStock:{ Url:"https://stock.finance.sina.com.cn/usstock/api/jsonp_v2.php/var%20_mKLine_=/US_MinKService.getMinK"},
+
         //https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine?symbol=FU2109
         Minute_Futrues:{Url:"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_FU2109=/InnerFuturesNewService.getMinLine" },
 
@@ -1580,6 +1622,10 @@ class HQDataV2
         else if (MARKET_SUFFIX_NAME.IsBJ(upperSymbol))
         {
             fixedSymbol=`bj${JSChart.GetShortSymbol(symbol)}`;
+        }
+        else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+        {
+            fixedSymbol=`gb_${JSChart.GetShortSymbol(symbol).toLowerCase()}`;
         }
 
         return fixedSymbol;
@@ -1814,6 +1860,8 @@ class HQDataV2
             return HQDataV2.JsonToStockItem_CFFEXOption_SINA(symbol,strContent);
         else if (MARKET_SUFFIX_NAME.IsCFFEX(upperSymbol))
             return HQDataV2.JsonToStockItem_CFFEX_SINA(symbol,strContent);
+        else if (MARKET_SUFFIX_NAME.IsUSA(upperSymbol))
+            return HQDataV2.JsonToStockItem_USAStock_SINA(symbol, strContent);
         
 
         return null;
@@ -1869,6 +1917,54 @@ class HQDataV2
         };
 
         if (!IFrameSplitOperator.IsPlusNumber(item.Price)) item.Price=item.Close;
+
+        if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Increase=(item.Price-item.YClose)/item.YClose*100; //涨跌%
+            item.UpDown=item.Price-item.YClose; //涨跌
+        }
+
+        if (IFrameSplitOperator.IsNumber(item.High) && IFrameSplitOperator.IsNumber(item.Low) && IFrameSplitOperator.IsPlusNumber(item.YClose))
+        {
+            item.Amplitude=(item.High-item.Low)/item.YClose*100;    //振幅%
+        }
+
+        return item;
+    }
+
+     //美股股数据
+    static JsonToStockItem_USAStock_SINA(symbol, strContent)
+    {
+        var match = strContent.match(/^(?:var|let|const)\s+\w+\s*=\s*['"](.+)['"]\s*;?$/);
+        if (!match || !match[1]) return null;
+
+        var strValue=match[0];
+        var strValue=match[1];
+        var arySrcValue=strValue.split(",");
+
+        var item=
+        {
+            Symbol: symbol,
+            Name: arySrcValue[0],
+            Close: HQDataV2.StringToNumber(arySrcValue[1]),
+            Price: HQDataV2.StringToNumber(arySrcValue[1]),
+            Increase:HQDataV2.StringToNumber(arySrcValue[3]),
+            UpDown:HQDataV2.StringToNumber(arySrcValue[4]),
+
+            Open: HQDataV2.StringToNumber(arySrcValue[5]),
+            High: HQDataV2.StringToNumber(arySrcValue[6]),
+            Low: HQDataV2.StringToNumber(arySrcValue[7]),
+
+            Vol: HQDataV2.StringToNumber(arySrcValue[10]),               //成交量
+            MarketValue:HQDataV2.StringToNumber(arySrcValue[12]),        //市值
+            Amount: HQDataV2.StringToNumber(arySrcValue[30]),            //成交金额
+
+            YClose: HQDataV2.StringToNumber(arySrcValue[26]),
+        };
+
+        var date=new Date(arySrcValue[3]);
+        item.Date=date.getFullYear()*10000+(date.getMonth()+1)*100+date.getDate();
+        item.Time=date.getHours()*10000+date.getMinutes()*100+date.getSeconds();
 
         if (IFrameSplitOperator.IsNumber(item.Price) && IFrameSplitOperator.IsPlusNumber(item.YClose))
         {
@@ -3015,6 +3111,90 @@ class HQDataV2
 
         return result;
     }
+
+
+    static async RequestKLine_Minute_USAStock_SINA(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var upperSymbol=symbol.toUpperCase();
+            var fixedSymbol=MARKET_SUFFIX_NAME.GetShortSymbol(symbol);
+            if (MARKET_SUFFIX_NAME.IsUSAIndex(upperSymbol)) fixedSymbol=`.${fixedSymbol}`;
+
+            var period=5;
+            if (IFrameSplitOperator.IsNumber(item.Period)) period=item.Period;
+            var fixedPeriod=5;
+            if (period==5) fixedPeriod=5;
+            else if (period==6) fixedPeriod=15;
+            else if (period==7) fixedPeriod=30;
+            else if (period==8) fixedPeriod=60;
+
+            //https://stock.finance.sina.com.cn/usstock/api/jsonp_v2.php/var%20_AACAY_5_1769189853353=/US_MinKService.getMinK?symbol=AACAY&type=5&___qn=3
+
+            var url=`${HQDataV2.SINA.KLineMinute_USAStock.Url}?symbol=${fixedSymbol}&type=${fixedPeriod}&___qn=3`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('gb18030'); //转字符集
+                const recv = decoder.decode(buffer);
+
+                var stockItem=HQDataV2.JsonToMinuteUSAStockData_SINA(recv, { Symbol:symbol, FixedSymbol:fixedSymbol, Data:stockItem });
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToMinuteUSAStockData_SINA(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Data:[] };
+        if (!recv) return stock;
+
+        const reg = /var\s+_mKLine_\s*=\s*\(([\s\S]*?)\)\s*;?/;
+        const match= recv.match(reg);
+        if (!match || !match[1]) return stock;
+
+        const aryKLine = JSON.parse(match[1]);
+        if (!IFrameSplitOperator.IsNonEmptyArray(aryKLine)) return stock;
+
+        var yClose=null;
+        for(var i=0;i<aryKLine.length;++i)
+        {
+            var item=aryKLine[i];
+            var high=parseFloat(item.h);
+            var low=parseFloat(item.l);
+            var open=parseFloat(item.o);
+            var close=parseFloat(item.c);
+            var vol=parseFloat(item.v);
+            var dateTime=new Date(item.d);
+
+            var date=dateTime.getFullYear()*10000+(dateTime.getMonth()+1)*100+dateTime.getDate();
+            var time=dateTime.getHours()*100+dateTime.getMinutes();
+
+            var kItem={ Date:date, Time:time, YClose:yClose,  Open:open, Close:close, High:high, Low:low, Vol:vol };
+            stock.Data.push(kItem);
+
+            yClose=close;
+        }
+
+        return stock;
+    }
+
+
+
+
     ////////////////////////////////////////////////////////////////////////////////////
     // 东方财富
     static EASTMONEY=
@@ -3026,6 +3206,9 @@ class HQDataV2
         //成交明细
         //https://futsseapi.eastmoney.com/static/113_snm_mx/11?_=1765982894782
         Detail:{ Url:"https://futsseapi.eastmoney.com/static/" },
+
+        //https://push2.eastmoney.com/api/qt/stock/details/get?fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55&fltt=2&cb=jQuery35109816081479539176_1769158966638&pos=-14&secid=105.NVDA&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=%7C0%7C0%7C0%7Cweb&_=1769158966639
+        StockDetail:{ Url:"https://push2.eastmoney.com/api/qt/stock/details/get?fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55&fltt=2"},
         //期权 成交明细
         Option_Detail:{ Url:"https://push2.eastmoney.com/api/qt/stock/details/get"}
     }
@@ -3242,6 +3425,25 @@ class HQDataV2
         else if (MARKET_SUFFIX_NAME.IsSZO(upperSymbol))
         {
             marketID=12;
+        }
+        else if (MARKET_SUFFIX_NAME.IsUSA_NSDAQ(upperSymbol))
+        {
+            marketID=105;
+        }
+        else if (MARKET_SUFFIX_NAME.IsUSA_NYSE(upperSymbol))
+        {
+            marketID=106;
+        }
+        else if (MARKET_SUFFIX_NAME.IsUSA_ANPDY(upperSymbol))  //美国粉单市场
+        {
+            marketID=153;
+        }
+        else if (MARKET_SUFFIX_NAME.IsUSAIndex(upperSymbol))
+        {
+            if (shortSymbol=="DJI") shortSymbol="DJIA";
+            else if (shortSymbol=="IXIC") shortSymbol="NDX";
+            else if (shortSymbol=="INX") shortSymbol="SPX";
+            marketID=100;
         }
         
 
@@ -3689,6 +3891,70 @@ class HQDataV2
         if (IFrameSplitOperator.IsNumber(recv.data.prePrice)) stockItem.YFClose=recv.data.prePrice;
 
         stockItem.Data.sort((left, right)=>{ return left.Time2-right.Time2; });
+        return stockItem;
+    }
+
+    //成交明细(美股票)
+    static async RequestUSAStockDetail_EASTMONEY(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var symbol=item.Symbol;
+            var fixedSymbol=HQDataV2.ConvertToEASTMONEYSymbol(symbol);
+            var count=50;
+            if (IFrameSplitOperator.IsNumber(item.Count)) count=item.Count;
+
+            //https://push2.eastmoney.com/api/qt/stock/details/get?fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55&fltt=2&cb=jQuery35109816081479539176_1769158966638&pos=-14&secid=105.NVDA&ut=fa5fd1943c7b386f172d6893dbfba10b&wbp2u=%7C0%7C0%7C0%7Cweb&_=1769158966639
+            var url=`${HQDataV2.EASTMONEY.StockDetail.Url}&pos=-${count}&secid=${fixedSymbol.MarketID}.${fixedSymbol.Symbol}&_=${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json();
+
+                var stockItem=HQDataV2.JsonToUSAStockDetailData_EASTMONEY(recv, { Symbol:symbol, FixedSymbol:fixedSymbol });
+
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, FixedSymbol:fixedSymbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToUSAStockDetailData_EASTMONEY(recv, symbolInfo)
+    {
+        var stockItem={ Symbol:symbolInfo.Symbol, Date:null, Data:[] };
+
+        if (!recv || !recv.data || !IFrameSplitOperator.IsNonEmptyArray(recv.data.details)) return stockItem;
+
+        for(var i=0;i<recv.data.details.length;++i)
+        {
+            var item=recv.data.details[i];
+            var aryValue=item.split(",");
+
+            var time=HQDataV2.StringToTimeNumber(aryValue[0]);
+            //var time=parseInt(HQDataV2.StringToTimeNumber(aryValue[0])/100);
+
+            var price=parseFloat(aryValue[1]);
+            var vol=parseFloat(aryValue[2]);
+
+            var type="";
+            if (aryValue[4]==1) type="B";
+            else if (aryValue[4]==2) type="S";
+
+            stockItem.Data.push({ Time:time, Price:price, Vol:vol, ID:i, Type:type });
+        }
+
+        if (IFrameSplitOperator.IsNumber(recv.data.prePrice)) stockItem.YClose=recv.data.prePrice;
+
         return stockItem;
     }
 }

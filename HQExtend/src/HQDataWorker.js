@@ -32,20 +32,21 @@ StockCodeList.GetInstance().Download();
 /*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.KLINE_MIN_DATA_ID;
-item.ArySymbol=[{ Symbol:"AU0.shfe" }, { Symbol:"601006.sh" }];
+item.ArySymbol=[ { Symbol:"TSM.nyse"}, { Symbol:"AU0.shfe" }, { Symbol:"601006.sh" }];
 */
+
 
 /*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
 item.ArySymbol=
 [ 
+    { Symbol:"TSM.NYSE"},
     { Symbol:"ZN2603-C-26500.shfe" },
     { Symbol:"10010448.sho" },
     { Symbol:"920000.bj"}, { Symbol:"AU2602.shfe"}, 
     { Symbol:"002594.sz"}, { Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  
 ];
-
 */
 
 
@@ -76,6 +77,7 @@ var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.DETAIL_DATA_ID;
 item.ArySymbol=
 [
+    { Symbol:"TSM.nyse"},
     { Symbol:"10010723.sho"},
     { Symbol:"920000.bj" }
 ];
@@ -84,11 +86,12 @@ item.ArySymbol=
 
 
 
-
+/*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.BASE_DATA_ID;
 item.ArySymbol=
 [
+    { Symbol:"bidu.usa"},
     { Symbol:"SA2601-C-1000.czc"},
     { Symbol:"M2605-P-2400.shfe"},
     { Symbol:"IO2601-C-4000.cffex"},
@@ -97,7 +100,7 @@ item.ArySymbol=
     { Symbol:"01810.hk" , Fields:{ KLine:{ Count:5 } } },{ Symbol:"HSI.hk", Fields:{ MinuteClose:true }},
     { Symbol:"300750.sz"} 
 ];
-
+*/
 
 
 
@@ -126,4 +129,4 @@ item.ArySymbol=
 
 
 
-g_HQChartDataService.RequestData(item);
+//g_HQChartDataService.RequestData(item);
