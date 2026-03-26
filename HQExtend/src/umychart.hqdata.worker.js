@@ -32,6 +32,8 @@ var JSCHART_DATA_TYPE_ID=
     SHARE_ID:200,           //股票股本数据
 
     STOCK_MINE_ID:301,      //个股地雷  { Symbol, Start:{ Date,}, End:{ Date, }, Type:[1=新闻,2=公告 50=除权] }  
+
+    GLOBAL_NEWS_ID:302,      //全球新闻
 }
 
 //客户端消息ID
@@ -165,6 +167,7 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.CODE_LIST_ID:
             case JSCHART_DATA_TYPE_ID.OPTION_LIST_ID:
             case JSCHART_DATA_TYPE_ID.STOCK_MINE_ID:
+            case JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID:
                 var bFind=false;
                 for(var i=0;i<this.RequestPool.length;++i)
                 {
@@ -178,6 +181,7 @@ class HQChartDataService
                 }
                 if (!bFind)  this.RequestPool.push(data);
                 break;
+            
         }
     }
 
@@ -252,6 +256,11 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.STOCK_MINE_ID:    //信息地雷
                 var reqData={ Request:item };
                 this.RequestStockMine(reqData);
+                break;
+
+            case JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID:
+                var reqData={ Request:item };
+                this.RequestGlobalNews(reqData);
                 break;
         }
        
@@ -538,6 +547,30 @@ class HQChartDataService
         var aryData=StockCodeList.GetInstance().GetStockList(reqData);
         var data={ AryStock:aryData, Code:0 };
 
+        this.SendHQData(request, data);
+    }
+
+
+    RequestGlobalNews(reqData)
+    {
+        HQDataV2.RequestGlobalNews_EASTMONEY(reqData).then((recv)=>
+        {
+            this.RecvGlobalNews(recv, reqData);
+        });
+    }
+
+    RecvGlobalNews(recv, option)
+    {
+        var request=option.Request;
+        var data={ AryStock:[], Code:0 };
+        for(var i=0;i<recv.AryData.length;++i)
+        {
+            var item=recv.AryData[i];
+            if (item.Code===0)
+            {
+                data.AryStock.push(item.Stock);
+            }
+        }
         this.SendHQData(request, data);
     }
 }
@@ -3283,6 +3316,9 @@ class HQDataV2
         //业绩预告
         //https://datacenter-web.eastmoney.com/api/data/v1/get?callback=jQuery112300019133678866765091_1774282191554&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=5&pageNumber=1&columns=ALL&filter=(SECURITY_CODE%3D%22300059%22)&reportName=RPT_PUBLIC_OP_NEWPREDICT
         StockPforecast:{ Url:"https://datacenter-web.eastmoney.com/api/data/v1/get"},
+
+        //https://np-weblist.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=50&req_trace=1774328438093
+        GlobalNews:{ Url:"https://np-weblist.eastmoney.com/comm/web/getFastNewsList" },
     }
 
     //股本数据
@@ -3545,6 +3581,65 @@ class HQDataV2
         if (right==0) return 0;
         else if (right==1) return 1;
         else return 2;
+    }
+
+    static async RequestGlobalNews_EASTMONEY(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var pageSize=50;
+            var symbol=item.Symbol;
+            if (IFrameSplitOperator.IsNumber(item.PageSize)) pageSize=item.PageSize;
+            //https://np-weblist.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=50&req_trace=1774328438093
+            var url=`${HQDataV2.EASTMONEY.GlobalNews.Url}?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=${pageSize}&req_trace=${new Date().getTime()}`;
+
+            try
+            {
+                const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                const recv = await response.json();
+
+                var stockItem=HQDataV2.JsonToGlobalNewsData_EASTMONEY(recv, { Symbol:symbol });
+                result.AryData.push({ Symbol:symbol, Url:url, Stock:stockItem, Code:0 });
+            }
+            catch(error)
+            {
+                result.AryData.push({ Symbol:symbol, Url:url, Code: 1});
+            }
+        }
+
+        return result;
+    }
+
+    static JsonToGlobalNewsData_EASTMONEY(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Data:[] };
+        if (recv && recv.data)
+        {
+            if (IFrameSplitOperator.IsNonEmptyArray(recv.data.fastNewsList))
+            {
+                var aryData=recv.data.fastNewsList;
+                for(var i=0;i<aryData.length;++i)
+                {
+                    var item=aryData[i];
+                    var arySplit=item.showTime.split(" ");
+                    var newItem=
+                    {
+                        Date:HQDataV2.StringToDateNumber(arySplit[0]),
+                        Time:HQDataV2.StringToTimeNumber(arySplit[1]),
+                        Title:item.title,
+                        ID:item.code,
+                    }
+
+                    stock.Data.push(newItem);
+                }
+            }
+        }
+
+        return stock;
     }
 
 

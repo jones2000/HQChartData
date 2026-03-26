@@ -127,12 +127,10 @@ item.ArySymbol=
 */
 
 var item=new HQRequestItem()
-item.Type=JSCHART_DATA_TYPE_ID.STOCK_MINE_ID;
+item.Type=JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID;
 item.ArySymbol=
 [
-    { Symbol:"688513.sh", 
-        Start:{ Date:20251217}, End:{ Date:20260320}, Type:[54 ]
-    },
+    { Symbol:"ALL", },
 ]
 
 g_HQChartDataService.RequestData(item);
