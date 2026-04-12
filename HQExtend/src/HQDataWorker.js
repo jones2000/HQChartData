@@ -126,11 +126,23 @@ item.ArySymbol=
 ];
 */
 
+/*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID;
 item.ArySymbol=
 [
     { Symbol:"ALL", },
 ]
+*/
+
+
+/*
+var item=new HQRequestItem()
+item.Type=JSCHART_DATA_TYPE_ID.STOCK_CHANGE_EVENT_ID;
+item.ArySymbol=
+[
+    { Symbol:"SH|SZ", PageCount:5, PageSize:50 },
+]
 
 g_HQChartDataService.RequestData(item);
+*/

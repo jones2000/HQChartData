@@ -34,6 +34,8 @@ var JSCHART_DATA_TYPE_ID=
     STOCK_MINE_ID:301,      //个股地雷  { Symbol, Start:{ Date,}, End:{ Date, }, Type:[1=新闻,2=公告 50=除权] }  
 
     GLOBAL_NEWS_ID:302,      //全球新闻
+
+    STOCK_CHANGE_EVENT_ID:303,  //盘口异动 { Symbol:, Type:[] }
 }
 
 //客户端消息ID
@@ -168,6 +170,7 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.OPTION_LIST_ID:
             case JSCHART_DATA_TYPE_ID.STOCK_MINE_ID:
             case JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID:
+            case JSCHART_DATA_TYPE_ID.STOCK_CHANGE_EVENT_ID:
                 var bFind=false;
                 for(var i=0;i<this.RequestPool.length;++i)
                 {
@@ -261,6 +264,11 @@ class HQChartDataService
             case JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID:
                 var reqData={ Request:item };
                 this.RequestGlobalNews(reqData);
+                break;
+
+            case JSCHART_DATA_TYPE_ID.STOCK_CHANGE_EVENT_ID:
+                var reqData={ Request:item };
+                this.RequestStockChangeEvent(reqData);
                 break;
         }
        
@@ -560,6 +568,29 @@ class HQChartDataService
     }
 
     RecvGlobalNews(recv, option)
+    {
+        var request=option.Request;
+        var data={ AryStock:[], Code:0 };
+        for(var i=0;i<recv.AryData.length;++i)
+        {
+            var item=recv.AryData[i];
+            if (item.Code===0)
+            {
+                data.AryStock.push(item.Stock);
+            }
+        }
+        this.SendHQData(request, data);
+    }
+
+    RequestStockChangeEvent(reqData)
+    {
+        HQDataV2.RequestStockChangeEvent_EASTMONEY(reqData).then((recv)=>
+        {
+            this.RecvStockChangeEvent(recv, reqData);
+        });
+    }
+
+    RecvStockChangeEvent(recv, option)
     {
         var request=option.Request;
         var data={ AryStock:[], Code:0 };
@@ -3319,6 +3350,10 @@ class HQDataV2
 
         //https://np-weblist.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=50&req_trace=1774328438093
         GlobalNews:{ Url:"https://np-weblist.eastmoney.com/comm/web/getFastNewsList" },
+
+        //盘口异动
+        //https://push2ex.eastmoney.com/getAllStockChanges?type=8201,8202,8193,4,32,64,8207,8209,8211,8213,8215,8204,8203,8194,8,16,128,8208,8210,8212,8214,8216&cb=jQuery351037033921145114423_1775702573402&ut=7eea3edcaed734bea9cbfc24409ed989&pageindex=1&pagesize=64&dpt=wzchanges&_=1775702573419
+        StockChange:{ Url:"https://push2ex.eastmoney.com/getAllStockChanges" },
     }
 
     //股本数据
@@ -3642,6 +3677,136 @@ class HQDataV2
         return stock;
     }
 
+    static async RequestStockChangeEvent_EASTMONEY(reqData)
+    {
+        var result={ AryData:[] };
+
+        var arySymbol=reqData.Request.ArySymbol;
+        for(var i=0; i<arySymbol.length; ++i)
+        {
+            var item=arySymbol[i];
+            var pageSize=64;
+            var strType="8201,8202,8193,4,32,64,8207,8209,8211,8213,8215,8204,8203,8194,8,16,128,8208,8210,8212,8214,8216";
+            var pageIndex=0;
+            var token="7eea3edcaed734bea9cbfc24409ed989"
+            var symbol=item.Symbol;
+            if (IFrameSplitOperator.IsNumber(item.PageSize)) pageSize=item.PageSize;
+            var pageCount=1, totalPageCount=1;
+            if (IFrameSplitOperator.IsNumber(item.PageCount)) pageCount=item.PageCount;
+
+            var aryData=[];
+            for(var j=0;j<totalPageCount && j<pageCount;++j, ++pageIndex)
+            {
+                //https://push2ex.eastmoney.com/getAllStockChanges?type=8201,8202,8193,4,32,64,8207,8209,8211,8213,8215,8204,8203,8194,8,16,128,8208,8210,8212,8214,8216&ut=7eea3edcaed734bea9cbfc24409ed989&pageindex=1&pagesize=64&dpt=wzchanges&_=1775702573419
+                var url=`${HQDataV2.EASTMONEY.StockChange.Url}?type=${strType}&ut=${token}&pageindex=${pageIndex}&pagesize=${pageSize}&dpt=wzchanges&_=${new Date().getTime()}`;
+
+                try
+                {
+                    const response= await fetch(url, {headers:{ "content-type": "application/javascript; charset=UTF-8"}});
+                    const recv = await response.json();
+
+                    var stockItem=HQDataV2.JsonToStockChangeEventData_EASTMONEY(recv, { Symbol:symbol });
+                    totalPageCount=Math.ceil(stockItem.Count / pageSize);
+                    aryData=aryData.concat(stockItem.Data);
+                }
+                catch(error)
+                {
+                    break;
+                }
+            }
+
+            result.AryData.push({ Symbol:symbol, Url:url, Stock:{ Symbol:symbol, Data:aryData }, Code:0 });
+        }
+
+        return result;
+    }
+
+    static JsonToStockChangeEventData_EASTMONEY(recv, symbolInfo)
+    {
+        var stock={ Symbol:symbolInfo.Symbol, Data:[], Count:0 };
+        if (recv && recv.data)
+        {
+            const mapEvent=new Map(
+            [
+                [1, { ID: 1, Name: "顶级买单", Color: 1, Type: "sl" }],
+                [2, { ID: 2, Name: "顶级卖单", Color: 2, Type: "sl" }],
+                [4, { ID: 4, Name: "封涨停板", Color: 1, Type: "price" }],
+                [8, { ID: 8, Name: "封跌停板", Color: 2, Type: "price" }],
+                [16, { ID: 16, Name: "打开涨停板", Color: 2, Type: "price" }],
+                [32, { ID: 32, Name: "打开跌停板", Color: 1, Type: "price" }],
+                [64, { ID: 64, Name: "有大买盘", Color: 1, Type: "sl" }],
+                [128, { ID: 128, Name: "有大卖盘", Color: 2, Type: "sl" }],
+                [256, { ID: 256, Name: "机构买单", Color: 1, Type: "sl" }],
+                [512, { ID: 512, Name: "机构卖单", Color: 2, Type: "sl" }],
+                [8193, { ID: 8193, Name: "大笔买入", Color: 1, Type: "sl" }],
+                [8194, { ID: 8194, Name: "大笔卖出", Color: 2, Type: "sl" }],
+                [8195, { ID: 8195, Name: "拖拉机买", Color: 1, Type: "sl" }],
+                [8196, { ID: 8196, Name: "拖拉机卖", Color: 2, Type: "sl" }],
+                [8201, { ID: 8201, Name: "火箭发射", Color: 1, Type: "change" }],
+                [8202, { ID: 8202, Name: "快速反弹", Color: 1, Type: "change" }],
+                [8203, { ID: 8203, Name: "高台跳水", Color: 2, Type: "change" }],
+                [8204, { ID: 8204, Name: "加速下跌", Color: 2, Type: "change" }],
+                [8205, { ID: 8205, Name: "买入撤单", Color: 2, Type: "sl" }],
+                [8206, { ID: 8206, Name: "卖出撤单", Color: 1, Type: "sl" }],
+                [8207, { ID: 8207, Name: "竞价上涨", Color: 1, Type: "change" }],
+                [8208, { ID: 8208, Name: "竞价下跌", Color: 2, Type: "change" }],
+                [8209, { ID: 8209, Name: "高开5日线", Color: 1, Type: "change" }],
+                [8210, { ID: 8210, Name: "低开5日线", Color: 2, Type: "change" }],
+                [8211, { ID: 8211, Name: "向上缺口", Color: 1, Type: "change" }],
+                [8212, { ID: 8212, Name: "向下缺口", Color: 2, Type: "change" }],
+                [8213, { ID: 8213, Name: "60日新高", Color: 1, Type: "price" }],
+                [8214, { ID: 8214, Name: "60日新低", Color: 2, Type: "price" }],
+                [8215, { ID: 8215, Name: "60日大幅上涨", Color: 1, Type: "change" }],
+                [8216, { ID: 8216, Name: "60日大幅下跌", Color: 2, Type: "change" }]
+            ]);
+
+            if (IFrameSplitOperator.IsNonEmptyArray(recv.data.allstock))
+            {
+                var aryData=recv.data.allstock;
+                for(var i=0;i<aryData.length;++i)
+                {
+                    var item=aryData[i];
+                    var time=item.tm;
+                    var symbol=item.c;
+                    if (item.m==0) symbol+=".sz";
+                    else symbol+=".sh";
+                    if (!mapEvent.has(item.t)) continue;
+                    var event=mapEvent.get(item.t);
+                    var text=null;
+                    var aryValue=item.i.split(",");
+                    var value=null;
+                    if (event.Type=="change") 
+                    {
+                        value={ Value:parseFloat(aryValue[0]) , Name:"涨幅" };
+                        value.Text=`${value.Value.toFixed(2)}%`;
+                    }
+                    else if (event.Type=="price") 
+                    {
+                        value={ Value:parseFloat(aryValue[0]) , Name:"价格" };
+                        value.Text=`${value.Value.toFixed(2)}元`;
+                    }
+                    else if (event.Type=="sl") 
+                    {
+                        value={ Value:parseInt(aryValue[0]) , Name:"手数" };
+                        value.Text=`${IFrameSplitOperator.FormatValueStringV2(value.Value, 0, 2)}手`;
+                    }
+
+                    var newItem=
+                    {
+                        Time:time, Stock:{ Symbol:symbol, Name:item.n },
+                        Name:event.Name, Color:event.Color, 
+                        Value:value
+                    }
+
+                    stock.Data.push(newItem);
+                }
+            }
+
+            if (IFrameSplitOperator.IsNumber(recv.data.tc)) stock.Count=recv.data.tc;
+        }
+
+        return stock;
+    }
 
      //分时图
     static async RequestMinuteV2_EASTMONEY(reqData)
