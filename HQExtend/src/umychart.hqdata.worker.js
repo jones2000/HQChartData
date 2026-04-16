@@ -661,6 +661,17 @@ class HQDataV2
             {
                 recvData= await HQDataV2.RequestMinuteV2_QQ({Request:{ ArySymbol:[item]}});
             }
+
+            if (item.BuySell && recvData && IFrameSplitOperator.IsNonEmptyArray(recvData.AryData) && recvData.AryData[0] && recvData.AryData[0].Stock)   //5档数据
+            {
+                var baseDataReq={ Request:{ ArySymbol:[ { Symbol:item.Symbol } ] } };
+                var recvBaseData=await HQDataV2.RequestStockRealtimeV2(baseDataReq);
+                if (recvBaseData && IFrameSplitOperator.IsNonEmptyArray(recvBaseData.AryData) && recvBaseData.AryData[0] && recvBaseData.AryData[0].Stock)
+                {
+                    var stockItem=recvBaseData.AryData[0];
+                    recvData.AryData[0].Stock.BaseData=stockItem.Stock;
+                }
+            }
             
             
             if (recvData)

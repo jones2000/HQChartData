@@ -36,18 +36,19 @@ item.ArySymbol=[ { Symbol:"TSM.nyse"}, { Symbol:"AU0.shfe" }, { Symbol:"601006.s
 */
 
 
-/*
+
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
 item.ArySymbol=
 [ 
-    { Symbol:"TSM.NYSE"},
-    { Symbol:"ZN2603-C-26500.shfe" },
-    { Symbol:"10010448.sho" },
-    { Symbol:"920000.bj"}, { Symbol:"AU2602.shfe"}, 
-    { Symbol:"002594.sz"}, { Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  
+    //{ Symbol:"TSM.NYSE"},
+    //{ Symbol:"ZN2603-C-26500.shfe" },
+    //{ Symbol:"10010448.sho" },
+    //{ Symbol:"920000.bj"}, { Symbol:"AU2602.shfe"}, 
+    { Symbol:"002594.sz", BuySell:true , Cache:false }, 
+    //{ Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  
 ];
-*/
+
 
 
 /*
@@ -135,7 +136,7 @@ item.ArySymbol=
 ]
 */
 
-
+/*
 
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.STOCK_CHANGE_EVENT_ID;
@@ -144,5 +145,6 @@ item.ArySymbol=
     { Symbol:"SH|SZ", PageCount:5, PageSize:50 },
     { Symbol:"688573.sh", PageSize:60 }
 ]
+*/
 
 g_HQChartDataService.RequestData(item);
