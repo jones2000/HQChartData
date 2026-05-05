@@ -36,7 +36,7 @@ item.ArySymbol=[ { Symbol:"TSM.nyse"}, { Symbol:"AU0.shfe" }, { Symbol:"601006.s
 */
 
 
-
+/*
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.MINUTE_DATA_ID;
 item.ArySymbol=
@@ -48,6 +48,7 @@ item.ArySymbol=
     { Symbol:"002594.sz", BuySell:true , Cache:false }, 
     //{ Symbol:"HSI.hk" },{ Symbol:"01211.hk"}  
 ];
+*/
 
 
 
@@ -127,14 +128,14 @@ item.ArySymbol=
 ];
 */
 
-/*
+
 var item=new HQRequestItem()
 item.Type=JSCHART_DATA_TYPE_ID.GLOBAL_NEWS_ID;
 item.ArySymbol=
 [
     { Symbol:"ALL", },
 ]
-*/
+
 
 /*
 

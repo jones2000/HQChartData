@@ -3711,6 +3711,7 @@ class HQDataV2
                         Time:HQDataV2.StringToTimeNumber(arySplit[1]),
                         Title:item.title,
                         ID:item.code,
+                        Url:`https://finance.eastmoney.com/a/${item.code}.html`
                     }
 
                     stock.Data.push(newItem);
